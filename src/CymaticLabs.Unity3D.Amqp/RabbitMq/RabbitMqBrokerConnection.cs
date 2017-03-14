@@ -1,16 +1,19 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Threading;
+using System.Net;
+using System.IO;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 using RabbitMQ.Client.Exceptions;
+using CymaticLabs.Unity3D.Amqp.SimpleJSON;
 
 namespace CymaticLabs.Unity3D.Amqp.RabbitMq
 {
     /// <summary>
     /// Represents a client connection to a RabbitMQ AMQP broker.
     /// </summary>
-    public class RabbitMqBrokerConnection : IAmqpBrokerConnection
+    public class RabbitMqBrokerConnection : AmqpBrokerConnectionBase, IAmqpBrokerConnection
     {
         #region Fields
 
@@ -43,7 +46,12 @@ namespace CymaticLabs.Unity3D.Amqp.RabbitMq
         /// <summary>
         /// The host broker's AMQP port number.
         /// </summary>
-        public int Port { get; private set; }
+        public int AmqpPort { get; private set; }
+
+        /// <summary>
+        /// The host broker's web/REST API port number.
+        /// </summary>
+        public int WebPort { get; private set; }
 
         /// <summary>
         /// The broker vhost to use. Default is '/'.
@@ -163,14 +171,15 @@ namespace CymaticLabs.Unity3D.Amqp.RabbitMq
         /// Initializes a new broker connection with the given host, port, and credentials.
         /// </summary>
         /// <param name="server">The host server name or IP.</param>
-        /// <param name="port">The host port number.</param>
+        /// <param name="amqpPort">The host AMQP port number.</param>
+        /// <param name="webPort">The host AMQP web/REST port number.</param>
         /// <param name="virtualHost">The broker virtual host to use.</param>
         /// <param name="username">The connection username.</param>
         /// <param name="password">The connection password.</param>
         /// <param name="reconnectInterval">The number of seconds to wait before connection retry attempts.</param>
         /// <param name="requestedHeartbeat">The client/server heartbeat in seconds.</param>
-        public RabbitMqBrokerConnection(string server, int port, string virtualHost, string username, string password, short reconnectInterval = 5, ushort requestedHeartbeat = 30)
-            : this("RabbitMQ Broker Connection", server, port, virtualHost, username, password, reconnectInterval, requestedHeartbeat)
+        public RabbitMqBrokerConnection(string server, int amqpPort, int webPort, string virtualHost, string username, string password, short reconnectInterval = 5, ushort requestedHeartbeat = 30)
+            : this("RabbitMQ Broker Connection", server, amqpPort, webPort, virtualHost, username, password, reconnectInterval, requestedHeartbeat)
         { }
 
         /// <summary>
@@ -178,18 +187,20 @@ namespace CymaticLabs.Unity3D.Amqp.RabbitMq
         /// </summary>
         /// <param name="name">The name to give the connection.</param>
         /// <param name="server">The host server name or IP.</param>
-        /// <param name="port">The host port number.</param>
+        /// <param name="amqpPort">The host AMQP port number.</param>
+        /// <param name="webPort">The host AMQP web/REST port number.</param>
         /// <param name="virtualHost">The broker virtual host to use.</param>
         /// <param name="username">The connection username.</param>
         /// <param name="password">The connection password.</param>
         /// <param name="reconnectInterval">The number of seconds to wait before connection retry attempts.</param>
         /// <param name="requestedHeartbeat">The client/server heartbeat in seconds.</param>
-        public RabbitMqBrokerConnection(string name, string server, int port, string virtualHost, 
+        public RabbitMqBrokerConnection(string name, string server, int amqpPort, int webPort, string virtualHost, 
             string username, string password, short reconnectInterval = 5, ushort requestedHeartbeat = 30)
         {
             Name = name;
             Server = server;
-            Port = port;
+            AmqpPort = amqpPort;
+            WebPort = webPort;
             VirtualHost = virtualHost;
             Username = username;
             Password = password;
@@ -246,7 +257,7 @@ namespace CymaticLabs.Unity3D.Amqp.RabbitMq
                         {
                             AutomaticRecoveryEnabled = false,
                             HostName = Server,
-                            Port = Port,
+                            Port = AmqpPort,
                             VirtualHost = VirtualHost,
                             UserName = Username,
                             Password = Password,
@@ -254,7 +265,7 @@ namespace CymaticLabs.Unity3D.Amqp.RabbitMq
                         };
 
                         // Enable encrypted connection based on port
-                        factory.Ssl.Enabled = Port == 5671 ? true : false;
+                        factory.Ssl.Enabled = AmqpPort == 5671 ? true : false;
 
                         // TODO Remove this line and setup proper certification registration policy for tighter security
                         factory.Ssl.AcceptablePolicyErrors = System.Net.Security.SslPolicyErrors.RemoteCertificateNameMismatch;
@@ -676,6 +687,106 @@ namespace CymaticLabs.Unity3D.Amqp.RabbitMq
         }
 
         #endregion Publishing
+
+        #region Exchanges
+
+        /// <summary>
+        /// Gets a list of exchanges for the current connection.
+        /// </summary>
+        /// <param name="virtualHost">The optional virtual host to get exchanges for. If NULL the connection's default virtual host is used.</param>
+        /// <returns>A list of AMQP exchanges for the current connection.</returns>
+        public AmqpExchange[] GetExchanges(string virtualHost = null)
+        {
+            if (string.IsNullOrEmpty(Server)) throw new InvalidOperationException("Server cannot be NULL when making a request to its REST API");
+
+            // If not supplied, use the default virtual host
+            if (virtualHost == null) virtualHost = VirtualHost;
+
+            // Create the web request for this broker
+            var url = (WebPort == 443 ? "https" : "http") + "://" + Server + ":" + WebPort.ToString() + "/api/exchanges/" + virtualHost;
+            var request = (HttpWebRequest)WebRequest.Create(url);
+
+            // Add authorization info
+            string authInfo = Username + ":" + Password;
+            authInfo = Convert.ToBase64String(System.Text.Encoding.Default.GetBytes(authInfo));
+            request.Headers["Authorization"] = "Basic " + authInfo;
+
+            // Apply the request and retrieve the response stream
+            var response = (HttpWebResponse)request.GetResponse();
+
+            // Read the response stream
+            var responseContent = "";
+
+            using (var sr = new StreamReader(response.GetResponseStream()))
+            {
+                responseContent = sr.ReadToEnd();
+            }
+
+            // Ensure the correct response format
+            if (string.IsNullOrEmpty(responseContent) || !responseContent.StartsWith("[")) // we expect a JSON array of exchange data
+            {
+                throw new Exception("Unexpected API response:\n" + responseContent);
+            }
+
+            // Parse the results and return
+            List<AmqpExchange> exchanges = new List<AmqpExchange>();
+            var items = JSON.Parse(responseContent).AsArray;
+            for (var i = 0; i < items.Count; i++) exchanges.Add(AmqpExchange.FromJson(items[i].AsObject));
+
+            return exchanges.ToArray();
+        }
+
+        #endregion Exchanges
+
+        #region Queues
+
+        /// <summary>
+        /// Gets a list of queues for the current connection.
+        /// </summary>
+        /// <param name="virtualHost">The optional virtual host to get queues for. If NULL the connection's default virtual host is used.</param>
+        /// <returns>A list of AMQP queues for the current connection.</returns>
+        public AmqpQueue[] GetQueues(string virtualHost = null)
+        {
+            if (string.IsNullOrEmpty(Server)) throw new InvalidOperationException("Server cannot be NULL when making a request to its REST API");
+
+            // If not supplied, use the default virtual host
+            if (virtualHost == null) virtualHost = VirtualHost;
+
+            // Create the web request for this broker
+            var url = (WebPort == 443 ? "https" : "http") + "://" + Server + ":" + WebPort.ToString() + "/api/queues/" + virtualHost;
+            var request = (HttpWebRequest)WebRequest.Create(url);
+
+            // Add authorization info
+            string authInfo = Username + ":" + Password;
+            authInfo = Convert.ToBase64String(System.Text.Encoding.Default.GetBytes(authInfo));
+            request.Headers["Authorization"] = "Basic " + authInfo;
+
+            // Apply the request and retrieve the response stream
+            var response = (HttpWebResponse)request.GetResponse();
+
+            // Read the response stream
+            var responseContent = "";
+
+            using (var sr = new StreamReader(response.GetResponseStream()))
+            {
+                responseContent = sr.ReadToEnd();
+            }
+
+            // Ensure the correct response format
+            if (string.IsNullOrEmpty(responseContent) || !responseContent.StartsWith("[")) // we expect a JSON array of exchange data
+            {
+                throw new Exception("Unexpected API response:\n" + responseContent);
+            }
+
+            // Parse the results and return
+            List<AmqpQueue> queues = new List<AmqpQueue>();
+            var items = JSON.Parse(responseContent).AsArray;
+            for (var i = 0; i < items.Count; i++) queues.Add(AmqpQueue.FromJson(items[i].AsObject));
+
+            return queues.ToArray();
+        }
+
+        #endregion Queues
 
         public override string ToString()
         {

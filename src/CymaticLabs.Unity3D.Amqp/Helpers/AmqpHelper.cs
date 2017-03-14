@@ -20,6 +20,16 @@ namespace CymaticLabs.Unity3D.Amqp
         public const int DefaultSecureAmqpPort = 5671;
 
         /// <summary>
+        /// The default unencrypted web/REST port.
+        /// </summary>
+        public const int DefaultUnsecureWebPort = 80;
+
+        /// <summary>
+        /// The default encrypted web/REST port.
+        /// </summary>
+        public const int DefaultSecureWebPort = 443;
+
+        /// <summary>
         /// The default AMQP virtual host.
         /// </summary>
         public const string DefaultVirtualHost = "/";
@@ -64,7 +74,7 @@ namespace CymaticLabs.Unity3D.Amqp
         public static string GetConnectionInfo(IAmqpBrokerConnection brokerConnection)
         {
             if (brokerConnection == null) throw new ArgumentNullException("brokerConnection");
-            return string.Format("{0}:{1} vhost:{2}", brokerConnection.Server, brokerConnection.Port, brokerConnection.VirtualHost);
+            return string.Format("{0}:{1} vhost:{2}", brokerConnection.Server, brokerConnection.AmqpPort, brokerConnection.VirtualHost);
         }
 
         #endregion Methods

@@ -330,7 +330,7 @@ namespace CymaticLabs.Unity3D.Amqp
             // Create the client if it doesn't already exist
             if (client == null)
             {
-                client = AmqpConnectionFactory.Create(Host, AmqpPort, VirtualHost, Username, Password, ReconnectInterval, RequestedHeartBeat);
+                client = AmqpConnectionFactory.Create(Host, AmqpPort, WebPort, VirtualHost, Username, Password, ReconnectInterval, RequestedHeartBeat);
                 client.Blocked += Client_Blocked;
                 client.Connected += Client_Connected;
                 client.Disconnected += Client_Disconnected;
@@ -758,5 +758,3 @@ namespace CymaticLabs.Unity3D.Amqp
         #endregion Methods
     }
 }
-
-

@@ -17,7 +17,12 @@ namespace CymaticLabs.Unity3D.Amqp
         /// <summary>
         /// The host broker's AMQP port number.
         /// </summary>
-        int Port { get; }
+        int AmqpPort { get; }
+
+        /// <summary>
+        /// The host broker's web/REST API port number.
+        /// </summary>
+        int WebPort { get; }
 
         /// <summary>
         /// The broker vhost to use. Default is '/'.
@@ -189,6 +194,28 @@ namespace CymaticLabs.Unity3D.Amqp
         void Publish(string exchange, string routingKey, IAmqpMessageProperties properties, byte[] body, bool mandatory = false, bool immediate = false);
 
         #endregion Publishing
+
+        #region Exchanges
+
+        /// <summary>
+        /// Gets a list of exchanges for the current connection.
+        /// </summary>
+        /// <param name="virtualHost">The optional virtual host to get exchanges for. If NULL the connection's default virtual host is used.</param>
+        /// <returns>A list of AMQP exchanges for the current connection.</returns>
+        AmqpExchange[] GetExchanges(string virtualHost = null);
+
+        #endregion Exchanges
+
+        #region Queues
+
+        /// <summary>
+        /// Gets a list of queues for the current connection.
+        /// </summary>
+        /// <param name="virtualHost">The optional virtual host to get queues for. If NULL the connection's default virtual host is used.</param>
+        /// <returns>A list of AMQP queues for the current connection.</returns>
+        AmqpQueue[] GetQueues(string virtualHost = null);
+
+        #endregion Queues
 
         #endregion Methods
     }

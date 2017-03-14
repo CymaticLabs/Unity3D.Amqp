@@ -36,7 +36,9 @@
   <ItemGroup>
     <Compile Include="AmqpConnectionFactory.cs" />
     <Compile Include="AmqpConnectionStates.cs" />
+    <Compile Include="AmqpExchange.cs" />
     <Compile Include="AmqpExchangeMessageReceivedEventHandler.cs" />
+    <Compile Include="AmqpQueue.cs" />
     <Compile Include="AmqpQueueSubscriptionEventHandler.cs" />
     <Compile Include="AmqpExchangeSubscriptionEventHandler.cs" />
     <Compile Include="AmqpQueueReceivedMessage.cs" />
@@ -55,6 +57,7 @@
     <Compile Include="AmqpExchangeSubscription.cs" />
     <Compile Include="RabbitMq\RabbitMqMessageProperties.cs" />
     <Compile Include="RabbitMq\RabbitMqReceivedMessage.cs" />
+    <Compile Include="SimpleJSON.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\lib\rabbitmq-dotnet-client-rabbitmq_v3_4_4\projects\client\RabbitMQ.Client\RabbitMQ.Client.csproj">

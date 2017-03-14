@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 using CymaticLabs.Unity3D.Amqp;
 
 namespace CymaticLabs.Unity3D.Amqp.Cli
@@ -10,6 +11,7 @@ namespace CymaticLabs.Unity3D.Amqp.Cli
         // Setup default argument values
         static string server = "localhost";
         static int port = AmqpHelper.DefaultUnsecureAmqpPort;
+        static int api = AmqpHelper.DefaultUnsecureWebPort;
         static string virtualHost = AmqpHelper.DefaultVirtualHost;
         static string username = "";
         static string password = "";
@@ -26,6 +28,8 @@ namespace CymaticLabs.Unity3D.Amqp.Cli
         static IAmqpBrokerConnection client;
         static AmqpExchangeSubscription rxExSub;
         static AmqpQueueSubscription rxQueueSub;
+
+        static string[] commands = new string[] { "rx", "tx", "exchanges", "queues" };
 
         #endregion Fields
 
@@ -62,6 +66,10 @@ namespace CymaticLabs.Unity3D.Amqp.Cli
 
                         case "port":
                             port = int.Parse(value);
+                            break;
+
+                        case "api":
+                            api = int.Parse(value);
                             break;
 
                         case "vhost":
@@ -121,7 +129,7 @@ namespace CymaticLabs.Unity3D.Amqp.Cli
 
                 #region Validate Arguments
 
-                if (command != "rx" && command != "tx")
+                if (!commands.Contains(command))
                 {
                     PrintUsage(args);
                     return;
@@ -130,24 +138,50 @@ namespace CymaticLabs.Unity3D.Amqp.Cli
                 #endregion Validate Arguments
 
                 // Create a new client using the supplied arguments
-                client = AmqpConnectionFactory.Create(server, port, virtualHost, username, password, reconnectInterval, requestedHeartbeat);
+                client = AmqpConnectionFactory.Create(server, port, api, virtualHost, username, password, reconnectInterval, requestedHeartbeat);
 
                 // Hook up event handlers
                 client.Blocked += Client_Blocked;
                 client.Connected += Client_Connected;
                 client.Disconnected += Client_Disconnected;
 
-                Console.WriteLine("Connecting to: {0}", AmqpHelper.GetConnectionInfo(client));
-                Console.WriteLine("Press enter to exit");
-                client.Connect();
-                Console.ReadLine();
-                CleanUp();
-                client.Disconnect();
+                // If this is an AMQP operation, connect
+                if (command == "rx" || command == "tx")
+                {
+                    Console.WriteLine("Connecting to: {0}", AmqpHelper.GetConnectionInfo(client));
+                    Console.WriteLine("Press enter to exit");
+                    client.Connect();
+                    Console.ReadLine();
+                    CleanUp();
+                    client.Disconnect();
+                }
+                // Otherwise this is a REST API operation so execute it
+                else
+                {
+                    if (command == "exchanges")
+                    {
+                        Console.WriteLine("Listing exchanges for {0}:{1} and virtual host '{2}'", server, api, virtualHost);
+
+                        foreach (var exchange in client.GetExchanges(virtualHost))
+                        {
+                            Console.WriteLine("name:{0}, type:{1}, auto delete:{2}, durable:{3}", exchange.Name, exchange.Type.ToString().ToLower(), exchange.AutoDelete, exchange.Durable);
+                        }
+                    }
+                    else if (command == "queues")
+                    {
+                        Console.WriteLine("Listing queues for {0}:{1} and virtual host '{2}'", server, api, virtualHost);
+
+                        foreach (var queue in client.GetQueues(virtualHost))
+                        {
+                            Console.WriteLine("name:{0}, auto delete:{1}, durable:{2}, state:{3}, policy:{4}, exclusive:{5}", queue.Name, queue.AutoDelete, queue.Durable, queue.State, queue.Policy, queue.ExclusiveConsumerTag);
+                        }
+                    }
+                }
             }
             catch (Exception ex)
             {
                 Console.WriteLine("{0}", ex);
-                Console.ReadLine();
+                //Console.ReadLine();
                 Environment.Exit(-1);
             }
         }
@@ -247,6 +281,7 @@ namespace CymaticLabs.Unity3D.Amqp.Cli
             Console.WriteLine("options:\n");
             Console.WriteLine("  server:     the AMQP host address\n");
             Console.WriteLine("  port:       the AMQP port to use (default {0})\n", AmqpHelper.DefaultUnsecureAmqpPort);
+            Console.WriteLine("  api:        the web/REST API port to use (default {0})\n", AmqpHelper.DefaultUnsecureWebPort);
             Console.WriteLine("  vhost:      the AMQP virtual host to use (default {0})\n", AmqpHelper.DefaultVirtualHost);
             Console.WriteLine("  u:");
             Console.WriteLine("  user:");
@@ -257,9 +292,11 @@ namespace CymaticLabs.Unity3D.Amqp.Cli
             Console.WriteLine("  reconnect:  the reconnect/retry interval in seconds (default {0})\n", AmqpHelper.DefaultReconnectInterval);
             Console.WriteLine("  heartbeat:  the connection heartbeat in seconds (default {0})\n", AmqpHelper.DefaultHeartBeat);
             Console.WriteLine("  cmd:");
-            Console.WriteLine("  command:    the command to use for testing ('rx' for subscribe, 'tx' for publish");
+            Console.WriteLine("  command:    the command to use for testing:");
             Console.WriteLine("              rx: requires an exchange name and exchange type to subscribe to (routing key optional)");
-            Console.WriteLine("              tx: requires an exchange name to publish to (routing key optional)\n");
+            Console.WriteLine("              tx: requires an exchange name to publish to (routing key optional)");
+            Console.WriteLine("              exchanges: requires a virtual host to list exchanges for");
+            Console.WriteLine("              queues: requires a virtual host to list queues for\n");
             Console.WriteLine("  exchange:   the name of the exchange to target (default {0})\n", AmqpHelper.DefaultExchangeName);
             Console.WriteLine("  type:       the type of the exchange [topic, fanout, direct, header] (default {0})", AmqpHelper.DefaultExchangeType.ToString().ToLower());
             Console.WriteLine("              [required when subscribing with 'rx']\n");
