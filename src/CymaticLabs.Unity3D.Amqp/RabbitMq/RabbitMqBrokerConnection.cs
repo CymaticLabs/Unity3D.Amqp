@@ -13,7 +13,7 @@ namespace CymaticLabs.Unity3D.Amqp.RabbitMq
     /// <summary>
     /// Represents a client connection to a RabbitMQ AMQP broker.
     /// </summary>
-    public class RabbitMqBrokerConnection : AmqpBrokerConnectionBase, IAmqpBrokerConnection
+    public class RabbitMqBrokerConnection : IAmqpBrokerConnection
     {
         #region Fields
 
