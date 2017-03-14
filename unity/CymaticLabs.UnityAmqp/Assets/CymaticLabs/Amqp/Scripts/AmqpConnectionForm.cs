@@ -21,18 +21,26 @@ namespace CymaticLabs.Unity3D.Amqp.UI
         public InputField Password;
         public Button ConnectButton;
         public Button DisconnectButton;
-        public InputField ExchangeName;
-        public Dropdown ExchangeType;
+
+        public Dropdown ExchangeName;
         public InputField RoutingKey;
         public Button SubscribeButton;
         public Button UnsubscribeButton;
+
+        public Dropdown PublishExchange;
+        public InputField PublishRoutingKey;
+        public InputField PublishMessage;
+        public Button PublishButton;
 
         #endregion Inspector
 
         #region Fields
 
         // List of created exchange subscriptions
-        List<UnityAmqpExchangeSubscription> exSubscriptions;
+        List<AmqpExchangeSubscription> exSubscriptions;
+
+        // The current list of exchanges
+        AmqpExchange[] exchanges;
 
         #endregion Fields
 
@@ -46,7 +54,7 @@ namespace CymaticLabs.Unity3D.Amqp.UI
 
         private void Awake()
         {
-            exSubscriptions = new List<UnityAmqpExchangeSubscription>();
+            exSubscriptions = new List<AmqpExchangeSubscription>();
             if (Host == null) Debug.LogError("AmqpConnectionForm.Host is not assigned");
             if (AmqpPort == null) Debug.LogError("AmqpConnectionForm.AmqpPort is not assigned");
             if (WebPort == null) Debug.LogError("AmqpConnectionForm.WebPort is not assigned");
@@ -54,10 +62,13 @@ namespace CymaticLabs.Unity3D.Amqp.UI
             if (Username == null) Debug.LogError("AmqpConnectionForm.Username is not assigned");
             if (Password == null) Debug.LogError("AmqpConnectionForm.Password is not assigned");
             if (ExchangeName == null) Debug.LogError("AmqpConnectionForm.ExchangeName is not assigned");
-            if (ExchangeType == null) Debug.LogError("AmqpConnectionForm.ExchangeType is not assigned");
             if (RoutingKey == null) Debug.LogError("AmqpConnectionForm.RoutingKey is not assigned");
             if (SubscribeButton == null) Debug.LogError("AmqpConnectionForm.SubscribeButton is not assigned");
             if (UnsubscribeButton == null) Debug.LogError("AmqpConnectionForm.UnsubscribeButton is not assigned");
+            if (PublishExchange == null) Debug.LogError("AmqpConnectionForm.PublishExchange is not assigned");
+            if (PublishRoutingKey == null) Debug.LogError("AmqpConnectionForm.PublishRoutingKey is not assigned");
+            if (PublishMessage == null) Debug.LogError("AmqpConnectionForm.PublishMessage is not assigned");
+            if (PublishButton == null) Debug.LogError("AmqpConnectionForm.PublishButton is not assigned");
         }
 
         private void Start()
@@ -66,6 +77,17 @@ namespace CymaticLabs.Unity3D.Amqp.UI
             AmqpClient.Instance.OnDisconnected.AddListener(HandleDisconnected);
             AmqpClient.Instance.OnReconnecting.AddListener(HandleReconnecting);
             AmqpClient.Instance.OnBlocked.AddListener(HandleBlocked);
+            AmqpClient.Instance.OnSubscribedToExchange.AddListener(HandleExchangeSubscribed);
+            AmqpClient.Instance.OnUnsubscribedFromExchange.AddListener(HandleExchangeUnsubscribed);
+
+            // Copy values from AmqpClient instance
+            var i = AmqpClient.Instance;
+            Host.text = i.Host;
+            AmqpPort.text = i.AmqpPort.ToString();
+            WebPort.text = i.WebPort.ToString();
+            VirtualHost.text = i.VirtualHost;
+            Username.text = i.Username;
+            Password.text = i.Password;
         }
 
         #endregion Init
@@ -132,6 +154,9 @@ namespace CymaticLabs.Unity3D.Amqp.UI
                 VirtualHost.text = "/";
             }
 
+            // Clear subscriptions
+            exSubscriptions.Clear();
+
             // Assign values
             AmqpClient.Instance.Host = Host.text;
             AmqpClient.Instance.AmqpPort = amqpPort;
@@ -141,6 +166,9 @@ namespace CymaticLabs.Unity3D.Amqp.UI
             AmqpClient.Instance.Password = Password.text;
 
             // Connect
+            ExchangeName.options.Clear();
+            PublishExchange.options.Clear();
+
             AmqpClient.Connect();
             AmqpConsole.Instance.Focus();
         }
@@ -163,7 +191,9 @@ namespace CymaticLabs.Unity3D.Amqp.UI
             // Validate args
             var isValid = true;
 
-            if (string.IsNullOrEmpty(ExchangeName.text))
+            var exchangeName = ExchangeName.options[ExchangeName.value].text;
+
+            if (string.IsNullOrEmpty(exchangeName))
             {
                 isValid = false;
                 AmqpConsole.Color = Color.red;
@@ -174,8 +204,18 @@ namespace CymaticLabs.Unity3D.Amqp.UI
             // Don't continue if values are invald
             if (!isValid) return;
 
-            var exchangeName = ExchangeName.text;
-            var exchangeType = (AmqpExchangeTypes)System.Enum.Parse(typeof(AmqpExchangeTypes), ExchangeType.options[ExchangeType.value].text, true);
+            var exchangeType = AmqpExchangeTypes.Direct;
+
+            // Find this exchange and get its exchange type
+            foreach (var exchange in exchanges)
+            {
+                if (exchange.Name == exchangeName)
+                {
+                    exchangeType = exchange.Type;
+                    break;
+                }
+            }
+
             var routingKey = RoutingKey.text;
 
             // Ensure this subscription doesn't already exist
@@ -194,9 +234,6 @@ namespace CymaticLabs.Unity3D.Amqp.UI
             // Create the new subscription
             var subscription = new UnityAmqpExchangeSubscription(exchangeName, exchangeType, routingKey, null, AmqpClient.Instance.UnityEventDebugExhangeMessageHandler);
 
-            // Add it to the local list
-            exSubscriptions.Add(subscription);
-
             // Subscribe on the client
             AmqpClient.Subscribe(subscription);
 
@@ -211,7 +248,9 @@ namespace CymaticLabs.Unity3D.Amqp.UI
             // Validate args
             var isValid = true;
 
-            if (string.IsNullOrEmpty(ExchangeName.text))
+            var exchangeName = ExchangeName.options[ExchangeName.value].text;
+
+            if (string.IsNullOrEmpty(exchangeName))
             {
                 isValid = false;
                 AmqpConsole.Color = Color.red;
@@ -222,8 +261,18 @@ namespace CymaticLabs.Unity3D.Amqp.UI
             // Don't continue if values are invald
             if (!isValid) return;
 
-            var exchangeName = ExchangeName.text;
-            var exchangeType = (AmqpExchangeTypes)System.Enum.Parse(typeof(AmqpExchangeTypes), ExchangeType.options[ExchangeType.value].text, true);
+            var exchangeType = AmqpExchangeTypes.Direct;
+
+            // Find this exchange and get its exchange type
+            foreach (var exchange in exchanges)
+            {
+                if (exchange.Name == exchangeName)
+                {
+                    exchangeType = exchange.Type;
+                    break;
+                }
+            }
+
             var routingKey = RoutingKey.text;
 
             // Ensure this subscription already exists
@@ -247,6 +296,60 @@ namespace CymaticLabs.Unity3D.Amqp.UI
             AmqpConsole.Instance.Focus();
         }
 
+        /// <summary>
+        /// Publishes a message to the current exchange using the form's input values.
+        /// </summary>
+        public void Publish()
+        {
+            // Validate args
+            var isValid = true;
+
+            var exchangeName = PublishExchange.options[PublishExchange.value].text;
+
+            if (string.IsNullOrEmpty(exchangeName))
+            {
+                isValid = false;
+                AmqpConsole.Color = Color.red;
+                AmqpConsole.WriteLine("* Exchange Name cannot be blank");
+                AmqpConsole.Color = null;
+            }
+
+            var message = PublishMessage.text;
+
+            if (string.IsNullOrEmpty(message))
+            {
+                isValid = false;
+                AmqpConsole.Color = Color.red;
+                AmqpConsole.WriteLine("* Message cannot be blank");
+                AmqpConsole.Color = null;
+            }
+
+            // Don't continue if values are invald
+            if (!isValid) return;
+
+            var exchangeType = AmqpExchangeTypes.Direct;
+
+            // Find this exchange and get its exchange type
+            foreach (var exchange in exchanges)
+            {
+                if (exchange.Name == exchangeName)
+                {
+                    exchangeType = exchange.Type;
+                    break;
+                }
+            }
+
+            var routingKey = PublishRoutingKey.text;
+
+            // Publish the message
+            AmqpClient.Publish(exchangeName, routingKey, message);
+            PublishMessage.text = null; // clear out message
+
+            AmqpConsole.Instance.Focus();
+        }
+
+        #region Event Handlers
+
         // Handles a connection event
         void HandleConnected()
         {
@@ -260,10 +363,31 @@ namespace CymaticLabs.Unity3D.Amqp.UI
             DisconnectButton.interactable = true;
 
             ExchangeName.interactable = true;
-            ExchangeType.interactable = true;
             RoutingKey.interactable = true;
             SubscribeButton.interactable = true;
             UnsubscribeButton.interactable = true;
+
+            PublishButton.interactable = true;
+            PublishExchange.interactable = true;
+            PublishMessage.interactable = true;
+            PublishRoutingKey.interactable = true;
+
+            // Query exchange list
+            exchanges = AmqpClient.GetExchanges();
+
+            foreach (var exchange in exchanges)
+            {
+                if (exchange.Name == null || exchange.Name == "/") continue;
+                var option = new Dropdown.OptionData(exchange.Name);
+                ExchangeName.options.Add(option);
+                PublishExchange.options.Add(option);
+            }
+
+            if (exchanges.Length > 0)
+            {
+                ExchangeName.RefreshShownValue();
+                PublishExchange.RefreshShownValue();
+            }
         }
 
         // Handles a disconnection event
@@ -279,10 +403,14 @@ namespace CymaticLabs.Unity3D.Amqp.UI
             DisconnectButton.interactable = false;
 
             ExchangeName.interactable = false;
-            ExchangeType.interactable = false;
             RoutingKey.interactable = false;
             SubscribeButton.interactable = false;
             UnsubscribeButton.interactable = false;
+
+            PublishButton.interactable = false;
+            PublishExchange.interactable = false;
+            PublishMessage.interactable = false;
+            PublishRoutingKey.interactable = false;
         }
 
         // Handles a reconnecting event
@@ -296,6 +424,22 @@ namespace CymaticLabs.Unity3D.Amqp.UI
         {
 
         }
+
+        // Handles exchange subscribes
+        void HandleExchangeSubscribed(AmqpExchangeSubscription subscription)
+        {
+            // Add it to the local list
+            exSubscriptions.Add(subscription);
+        }
+
+        // Handles exchange unsubscribes
+        void HandleExchangeUnsubscribed(AmqpExchangeSubscription subscription)
+        {
+            // Add it to the local list
+            exSubscriptions.Remove(subscription);
+        }
+
+        #endregion Event Handlers
 
         #endregion Methods
     }

@@ -2,6 +2,9 @@
 using System.Linq;
 using CymaticLabs.Unity3D.Amqp;
 
+using System.Net.Security;
+using System.Security.Cryptography.X509Certificates;
+
 namespace CymaticLabs.Unity3D.Amqp.Cli
 {
     class Program

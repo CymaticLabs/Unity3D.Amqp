@@ -107,6 +107,21 @@ namespace CymaticLabs.Unity3D.Amqp
         // A queue of incoming queue-based messages
         Queue<AmqpQueueReceivedMessage> queueMessages;
 
+        // A queue of incoming unhandled exceptions
+        Queue<System.Exception> exceptions;
+
+        // A queue of exchange subscribes
+        Queue<AmqpExchangeSubscription> subscribedExchanges;
+
+        // A queue of exchange unsubscribes
+        Queue<AmqpExchangeSubscription> unsubscribedExchanges;
+
+        // A queue of exchange subscribes
+        Queue<AmqpQueueSubscription> subscribedQueues;
+
+        // A queue of exchange unsubscribes
+        Queue<AmqpQueueSubscription> unsubscribedQueues;
+
         // Whether or not the application is currently quitting
         bool isQuitting = false;
 
@@ -156,6 +171,31 @@ namespace CymaticLabs.Unity3D.Amqp
         /// </summary>
         public UnityEvent OnReconnecting;
 
+        /// <summary>
+        /// Occurs when there is a connection error.
+        /// </summary>
+        public ExceptionUnityEvent OnConnectionError;
+
+        /// <summary>
+        /// Occurs when the client subscribes to an exchange.
+        /// </summary>
+        public AmqpExchangeSubscriptionUnityEvent OnSubscribedToExchange;
+
+        /// <summary>
+        /// Occurs when the client unsubscribes from an exchange.
+        /// </summary>
+        public AmqpExchangeSubscriptionUnityEvent OnUnsubscribedFromExchange;
+
+        /// <summary>
+        /// Occurs when the client subscribes to a queue.
+        /// </summary>
+        public AmqpQueueSubscriptionUnityEvent OnSubscribedToQueue;
+
+        /// <summary>
+        /// Occurs when the client unsubscribes from a queue.
+        /// </summary>
+        public AmqpQueueSubscriptionUnityEvent OnUnsubscribedFromQueue;
+
         #endregion Events
 
         #region Methods
@@ -169,6 +209,11 @@ namespace CymaticLabs.Unity3D.Amqp
             exMessages = new Queue<AmqpExchangeReceivedMessage>();
             queueSubscriptions = new List<AmqpQueueSubscription>();
             queueMessages = new Queue<AmqpQueueReceivedMessage>();
+            exceptions = new Queue<System.Exception>();
+            subscribedExchanges = new Queue<AmqpExchangeSubscription>();
+            unsubscribedExchanges = new Queue<AmqpExchangeSubscription>();
+            subscribedQueues = new Queue<AmqpQueueSubscription>();
+            unsubscribedQueues = new Queue<AmqpQueueSubscription>();
 
             // Assign singleton instance
             Instance = this;
@@ -187,7 +232,7 @@ namespace CymaticLabs.Unity3D.Amqp
         }
 
         private void Start()
-        {
+        {          
             // Connect to host broker on start if configured
             if (ConnectOnStart) Connect();
         }
@@ -246,12 +291,135 @@ namespace CymaticLabs.Unity3D.Amqp
 
             if (isQuitting) return;
 
+            #region Process Exceptions
+
+            if (exceptions.Count > 0)
+            {
+                var errors = new System.Exception[exceptions.Count];
+
+                lock(this)
+                {
+                    // Copy the list and clear queue
+                    exceptions.CopyTo(errors, 0);
+                    exceptions.Clear();
+                }
+
+                foreach (var ex in errors)
+                {
+                    // Notify
+                    if (OnConnectionError != null) OnConnectionError.Invoke(ex);
+
+                    // Log
+                    AmqpConsole.Color = Color.red;
+                    Log("{0}", ex);
+                    AmqpConsole.Color = null;
+                }
+            }
+
+            #endregion Process Exceptions
+
+            #region Process Subscribes
+
+            // Exchanges
+            if (subscribedExchanges.Count > 0)
+            {
+                var subscriptions = new AmqpExchangeSubscription[subscribedExchanges.Count];
+
+                lock (this)
+                {
+                    // Copy the list and clear queue
+                    subscribedExchanges.CopyTo(subscriptions, 0);
+                    subscribedExchanges.Clear();
+                }
+
+                foreach (var sub in subscriptions)
+                {
+                    // Notify
+                    if (OnSubscribedToExchange != null) OnSubscribedToExchange.Invoke(sub);
+
+                    // Log
+                    Log("Subscribed to exchange: {0}:{1}", sub.ExchangeName, sub.RoutingKey);
+                }
+            }
+
+            // Queues
+            if (subscribedQueues.Count > 0)
+            {
+                var subscriptions = new AmqpQueueSubscription[subscribedQueues.Count];
+
+                lock (this)
+                {
+                    // Copy the list and clear queue
+                    subscribedQueues.CopyTo(subscriptions, 0);
+                    subscribedQueues.Clear();
+                }
+
+                foreach (var sub in subscriptions)
+                {
+                    // Notify
+                    if (OnSubscribedToQueue != null) OnSubscribedToQueue.Invoke(sub);
+
+                    // Log
+                    Log("Subscribed to queue: {0}:{1}", sub.QueueName, sub.UseAck);
+                }
+            }
+
+            #endregion Process Subscribes
+
+            #region Process Unsubscribes
+
+            // Exchanges
+            if (unsubscribedExchanges.Count > 0)
+            {
+                var subscriptions = new AmqpExchangeSubscription[unsubscribedExchanges.Count];
+
+                lock (this)
+                {
+                    // Copy the list and clear queue
+                    unsubscribedExchanges.CopyTo(subscriptions, 0);
+                    unsubscribedExchanges.Clear();
+                }
+
+                foreach (var sub in subscriptions)
+                {
+                    // Notify
+                    if (OnUnsubscribedFromExchange != null) OnUnsubscribedFromExchange.Invoke(sub);
+
+                    // Log
+                    Log("Unsubscribed from exchange: {0}:{1}", sub.ExchangeName, sub.RoutingKey);
+                }
+            }
+
+            // Queues
+            if (unsubscribedQueues.Count > 0)
+            {
+                var subscriptions = new AmqpQueueSubscription[unsubscribedQueues.Count];
+
+                lock (this)
+                {
+                    // Copy the list and clear queue
+                    unsubscribedQueues.CopyTo(subscriptions, 0);
+                    unsubscribedQueues.Clear();
+                }
+
+                foreach (var sub in subscriptions)
+                {
+                    // Notify
+                    if (OnUnsubscribedFromQueue != null) OnUnsubscribedFromQueue.Invoke(sub);
+
+                    // Log
+                    Log("Unsubscribed from queue: {0}:{1}", sub.QueueName, sub.UseAck);
+                }
+            }
+
+            #endregion Process Unsubscribes
+
             #region Process Incoming Messages
 
             // Process exchange messages
             if (exMessages.Count > 0)
             {
-                AmqpExchangeReceivedMessage[] received = new AmqpExchangeReceivedMessage[exMessages.Count];
+                var received = new AmqpExchangeReceivedMessage[exMessages.Count];
 
                 lock (this)
                 {
@@ -271,7 +439,7 @@ namespace CymaticLabs.Unity3D.Amqp
             // Process queue messages
             if (queueMessages.Count > 0)
             {
-                AmqpQueueReceivedMessage[] received = new AmqpQueueReceivedMessage[queueMessages.Count];
+                var received = new AmqpQueueReceivedMessage[queueMessages.Count];
 
                 lock (this)
                 {
@@ -327,15 +495,31 @@ namespace CymaticLabs.Unity3D.Amqp
                 return;
             }
 
-            // Create the client if it doesn't already exist
-            if (client == null)
+            // If a client already exists, unregister from events
+            if (client != null)
             {
-                client = AmqpConnectionFactory.Create(Host, AmqpPort, WebPort, VirtualHost, Username, Password, ReconnectInterval, RequestedHeartBeat);
-                client.Blocked += Client_Blocked;
-                client.Connected += Client_Connected;
-                client.Disconnected += Client_Disconnected;
-                client.Reconnecting += Client_Reconnecting;
+                client.Blocked -= Client_Blocked;
+                client.Connected -= Client_Connected;
+                client.Disconnected -= Client_Disconnected;
+                client.Reconnecting -= Client_Reconnecting;
+                client.ConnectionError -= Client_ConnectionError;
+                client.SubscribedToExchange -= Client_SubscribedToExchange;
+                client.UnsubscribedFromExchange -= Client_UnsubscribedFromExchange;
+                client.SubscribedToQueue -= Client_SubscribedToQueue;
+                client.UnsubscribedFromQueue -= Client_UnsubscribedFromQueue;
             }
+
+            // Create the client for the connection
+            client = AmqpConnectionFactory.Create(Host, AmqpPort, WebPort, VirtualHost, Username, Password, ReconnectInterval, RequestedHeartBeat);
+            client.Blocked += Client_Blocked;
+            client.Connected += Client_Connected;
+            client.Disconnected += Client_Disconnected;
+            client.Reconnecting += Client_Reconnecting;
+            client.ConnectionError += Client_ConnectionError;
+            client.SubscribedToExchange += Client_SubscribedToExchange;
+            client.UnsubscribedFromExchange += Client_UnsubscribedFromExchange;
+            client.SubscribedToQueue += Client_SubscribedToQueue;
+            client.UnsubscribedFromQueue += Client_UnsubscribedFromQueue;
 
             // Connect the client
             Log("Connecting to AMQP host: {0}", AmqpHelper.GetConnectionInfo(client));
@@ -405,6 +589,51 @@ namespace CymaticLabs.Unity3D.Amqp
             lock (this)
             {
                 isReconnecting = true;
+            }
+        }
+
+        // Handles when a connection error occurs
+        private void Client_ConnectionError(object sender, ExceptionEventArgs e)
+        {
+            lock(this)
+            {
+                exceptions.Enqueue(e.Exception);
+            }
+        }
+
+        // Handles when an exchange is subscribed to
+        private void Client_SubscribedToExchange(AmqpExchangeSubscription subscription)
+        {
+            lock(this)
+            {
+                subscribedExchanges.Enqueue(subscription);
+            }
+        }
+
+        // Handles when an exchange is unsubscribed from
+        private void Client_UnsubscribedFromExchange(AmqpExchangeSubscription subscription)
+        {
+            lock (this)
+            {
+                unsubscribedExchanges.Enqueue(subscription);
+            }
+        }
+
+        // Handles when a queue is subscribed to
+        private void Client_SubscribedToQueue(AmqpQueueSubscription subscription)
+        {
+            lock (this)
+            {
+                subscribedQueues.Enqueue(subscription);
+            }
+        }
+
+        // Handles when a queue is unsubscribed from
+        private void Client_UnsubscribedFromQueue(AmqpQueueSubscription subscription)
+        {
+            lock (this)
+            {
+                unsubscribedQueues.Enqueue(subscription);
             }
         }
 
@@ -516,7 +745,6 @@ namespace CymaticLabs.Unity3D.Amqp
 
                 // Subscribe with the message broker
                 client.Subscribe(sub);
-                Log("Listening for messages on exchange: {0}:{1}", sub.ExchangeName, sub.RoutingKey);
             }
 
             foreach (var sub in queueSubscriptions)
@@ -543,7 +771,6 @@ namespace CymaticLabs.Unity3D.Amqp
 
                 // Subscribe with the message broker
                 client.Subscribe(sub);
-                Log("Listening for messages on queue: {0}:{1}", sub.QueueName, sub.UseAck);
             }
         }
 
@@ -578,7 +805,32 @@ namespace CymaticLabs.Unity3D.Amqp
             if (client.IsConnected)
             {
                 client.Unsubscribe(subscription);
-                Log("Unsubscribed from {0}:{1}", subscription.Name, subscription.RoutingKey);
+            }
+        }
+
+        /// <summary>
+        /// unsubscribes from a given queue.
+        /// </summary>
+        /// <param name="subscription">The queue subscription to unsubscribe from.</param>
+        public static void Unsubscribe(AmqpQueueSubscription subscription)
+        {
+            if (Instance == null) return;
+            Instance.UnsubscribeFromQueue(subscription);
+        }
+
+        /// <summary>
+        /// unsubscribes from a given queue.
+        /// </summary>
+        /// <param name="subscription">The queue subscription to unsubscribe from.</param>
+        public void UnsubscribeFromQueue(AmqpQueueSubscription subscription)
+        {
+            if (isQuitting) return;
+            if (subscription == null) throw new System.ArgumentNullException("subscription");
+            if (queueSubscriptions.Contains(subscription)) queueSubscriptions.Remove(subscription);
+
+            if (client.IsConnected)
+            {
+                client.Unsubscribe(subscription);
             }
         }
 
@@ -668,6 +920,58 @@ namespace CymaticLabs.Unity3D.Amqp
         //}
 
         #endregion Publish
+
+        #region Exchanges
+
+        /// <summary>
+        /// Gets a list of exchanges for the current connection.
+        /// </summary>
+        /// <param name="virtualHost">The optional virtual host to get exchanges for. If NULL the connection's default virtual host is used.</param>
+        /// <returns>A list of AMQP exchanges for the current connection.</returns>
+        public static AmqpExchange[] GetExchanges(string virtualHost = null)
+        {
+            if (Instance == null) return new AmqpExchange[0];
+            return Instance.GetExchangeList(virtualHost);
+        }
+
+        /// <summary>
+        /// Gets a list of exchanges for the current connection.
+        /// </summary>
+        /// <param name="virtualHost">The optional virtual host to get exchanges for. If NULL the connection's default virtual host is used.</param>
+        /// <returns>A list of AMQP exchanges for the current connection.</returns>
+        public AmqpExchange[] GetExchangeList(string virtualHost = null)
+        {
+            if (!IsConnected) return new AmqpExchange[0];
+            return client.GetExchanges(virtualHost);
+        }
+
+        #endregion Exchanges
+
+        #region Queues
+
+        /// <summary>
+        /// Gets a list of queues for the current connection.
+        /// </summary>
+        /// <param name="virtualHost">The optional virtual host to get exchanges for. If NULL the connection's default virtual host is used.</param>
+        /// <returns>A list of AMQP exchanges for the current connection.</returns>
+        public static AmqpQueue[] GetQueues(string virtualHost = null)
+        {
+            if (Instance == null) return new AmqpQueue[0];
+            return Instance.GetQueueList(virtualHost);
+        }
+
+        /// <summary>
+        /// Gets a list of queues for the current connection.
+        /// </summary>
+        /// <param name="virtualHost">The optional virtual host to get exchanges for. If NULL the connection's default virtual host is used.</param>
+        /// <returns>A list of AMQP exchanges for the current connection.</returns>
+        public AmqpQueue[] GetQueueList(string virtualHost = null)
+        {
+            if (!IsConnected) return new AmqpQueue[0];
+            return client.GetQueues(virtualHost);
+        }
+
+        #endregion Queues
 
         #region Logging
 

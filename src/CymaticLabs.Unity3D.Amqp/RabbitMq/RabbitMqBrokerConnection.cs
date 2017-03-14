@@ -144,6 +144,11 @@ namespace CymaticLabs.Unity3D.Amqp.RabbitMq
         public event EventHandler Reconnecting;
 
         /// <summary>
+        /// Occurs when there is a connection error.
+        /// </summary>
+        public event EventHandler<ExceptionEventArgs> ConnectionError;
+
+        /// <summary>
         /// Occurs when an exchange has been subscribed to.
         /// </summary>
         public event AmqpExchangeSubscriptionEventHandler SubscribedToExchange;
@@ -224,7 +229,7 @@ namespace CymaticLabs.Unity3D.Amqp.RabbitMq
             if (State == AmqpConnectionStates.Connected && (Connection == null || !Connection.IsOpen))
             {
                 State = AmqpConnectionStates.Disconnected;
-                if (Disconnected != null) Disconnected(this, EventArgs.Empty);
+                Disconnected?.Invoke(this, EventArgs.Empty);
             }
         }
 
@@ -235,6 +240,7 @@ namespace CymaticLabs.Unity3D.Amqp.RabbitMq
         {
             if (IsConnected) return;
             State = AmqpConnectionStates.Connecting;
+
             //StreamRuntime.Current.LogInfo("Connecting to {0}...", this);
             Console.WriteLine("Connecting to {0}...", this);
 
@@ -266,8 +272,12 @@ namespace CymaticLabs.Unity3D.Amqp.RabbitMq
 
                         // Enable encrypted connection based on port
                         factory.Ssl.Enabled = AmqpPort == 5671 ? true : false;
+                        factory.Ssl.ServerName = Server; // this is needed so that Mono won't have an exception when it's NULL
 
-                        // TODO Remove this line and setup proper certification registration policy for tighter security
+                        // Add in custom SSL certificate validator so we have the ability to enable untrusted SSL certificates and deal with Mono issues
+                        factory.Ssl.CertificateValidationCallback = SslHelper.RemoteCertificateValidationCallback;
+
+                        // TODO Eventually allow requiring server name/cert matching to be configurable, for now disable enforcement
                         factory.Ssl.AcceptablePolicyErrors = System.Net.Security.SslPolicyErrors.RemoteCertificateNameMismatch;
 
                         // Create the connection for the connection
@@ -289,7 +299,7 @@ namespace CymaticLabs.Unity3D.Amqp.RabbitMq
                         bc.State = AmqpConnectionStates.Connected;
                         //StreamRuntime.Current.LogInfo("Connected to {0}", this);
                         Console.WriteLine("Connected to {0}", this);
-                        if (Connected != null) Connected(this, EventArgs.Empty);
+                        Connected?.Invoke(this, EventArgs.Empty);
                     }
                     catch (Exception ex)
                     {
@@ -305,7 +315,8 @@ namespace CymaticLabs.Unity3D.Amqp.RabbitMq
 
                             // Don't attempt to reconnect, we know the credentials are bad
                             bc.State = AmqpConnectionStates.Disconnected;
-                            if (Disconnected != null) Disconnected(this, EventArgs.Empty);
+                            Disconnected?.Invoke(this, EventArgs.Empty);
+                            ConnectionError?.Invoke(this, new ExceptionEventArgs(ex));
                         }
                         else
                         {
@@ -315,8 +326,10 @@ namespace CymaticLabs.Unity3D.Amqp.RabbitMq
                                 //StreamRuntime.Current.LogError("(retries:{0}) Error connecting to {1} => {2}",
                                 //    retryCount, this, ex.Message);
                                 Console.WriteLine("(retries:{0}) Error connecting to {1} => {2}", retryCount, this, ex.Message);
-                                if (Reconnecting != null) Reconnecting(this, EventArgs.Empty);
+                                Reconnecting?.Invoke(this, EventArgs.Empty);
                             }
+
+                            ConnectionError?.Invoke(this, new ExceptionEventArgs(ex));
 
                             // Sleep a bit before retrying to connect
                             Thread.Sleep(ReconnectInterval * 1000);
@@ -341,7 +354,7 @@ namespace CymaticLabs.Unity3D.Amqp.RabbitMq
                 Connection.Close();
                 State = AmqpConnectionStates.Disconnected;
                 Console.WriteLine("Disconnected from {0}", this);
-                if (Disconnected != null) Disconnected(this, EventArgs.Empty);
+                Disconnected?.Invoke(this, EventArgs.Empty);
             }
         }
 
@@ -456,7 +469,7 @@ namespace CymaticLabs.Unity3D.Amqp.RabbitMq
             exchangeSubscriptions.Add(subscription);
 
             // Notify
-            if (SubscribedToExchange != null) SubscribedToExchange(subscription);
+            SubscribedToExchange?.Invoke(subscription);
         }
 
         /// <summary>
@@ -488,7 +501,7 @@ namespace CymaticLabs.Unity3D.Amqp.RabbitMq
             exchangeSubscriptions.Remove(subscription);
 
             // Notify
-            if (UnsubscribedFromExchange != null) UnsubscribedFromExchange(subscription);
+            UnsubscribedFromExchange?.Invoke(subscription);
         }
 
         #endregion Exchange
@@ -550,7 +563,7 @@ namespace CymaticLabs.Unity3D.Amqp.RabbitMq
             queueSubscriptions.Add(subscription);
 
             // Notify
-            if (SubscribedToQueue != null) SubscribedToQueue(subscription);
+            SubscribedToQueue?.Invoke(subscription);
         }
 
         /// <summary>
@@ -581,7 +594,7 @@ namespace CymaticLabs.Unity3D.Amqp.RabbitMq
             queueSubscriptions.Remove(subscription);
 
             // Notify
-            if (UnsubscribedFromQueue != null) UnsubscribedFromQueue(subscription);
+            UnsubscribedFromQueue?.Invoke(subscription);
         }
 
         #endregion Queue

@@ -84,6 +84,11 @@ namespace CymaticLabs.Unity3D.Amqp
         event EventHandler Reconnecting;
 
         /// <summary>
+        /// Occurs when there is a connection error.
+        /// </summary>
+        event EventHandler<ExceptionEventArgs> ConnectionError;
+
+        /// <summary>
         /// Occurs when an exchange has been subscribed to.
         /// </summary>
         event AmqpExchangeSubscriptionEventHandler SubscribedToExchange;
