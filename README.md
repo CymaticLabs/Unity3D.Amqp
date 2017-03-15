@@ -68,6 +68,40 @@ For an example of how to work with the library, open the **AmqpDemo** scene foun
 
 Find the **AmqpClient** game object in the demo scene and familiarize yourself with the **AmqpClient.cs** script. This MonoBehaviour is the main way to interface with an AMQP broker from Unity. It exposes events and methods for connecting, disconnecting, subscribing, and publishing to an AMQP broker. If you only need a single broker connection it has convenient static methods or you can create multiple instances for multiple connections.
 
+You can look for the **AmqpClient** prefab or just drag the script onto a GameObject in your scene. Here's what it looks like in the inspector:
+
+![AmqpClient in Unity Inspector](docs/img/amqp-client-inspector-1.png)
+
+**Note:** The follow explanation pertains to RabbitMQ servers specifically. Your mileage may vary with other AMQP servers/brokers. The Web Port and exchange/queue descovery methods are specifically implemented for RabbitMQ servers and will probably fail with other hosts.
+
+Here's a quick description of the script's inspector properties:
+
+* **Connect On Start** - When enabled the script will attempt to establish a connection to the AMQP server on Start()
+* **Relaxed Ssl Validation** - When enabled SSL certificate validation from the AMQP server will be relaxed ([see details](#ssl-support))
+* **Write To Console** - When enabled important AMQP log details will be written to the included AmqpConsole class/prefab (optional)
+* **Host** - The host address of the AMQP server to connect to
+* **Amqp Port** - The AMQP protocol port number on the host to connect to (5672 is default unencrypted, 5671 is default encrypted)
+* **Web Port** - The web port number on the host to connect to that is used for exchange/queue discovery (for local RabbitMQ server 15672 is default, 80 is default for unencrypted, and 443 is default for encrypted) 
+* **Virtual Host** - The [RabbitMQ virtual host ](https://www.rabbitmq.com/vhosts.html) to connect to
+* **Username** - The client username to use when connecting to the AMQP server
+* **Password** - The client password to use when connecting to the AMQP server
+* **Reconnect Interval** - The number of seconds to wait inbetween connection retries when the connection to the server fails (1 second minimum)
+* **Requested Heart Beat** - The number of seconds of the requested connection keep-alive heart beat.
+* **Exchange Subscriptions** - A list of exchange subscriptions that the client will subscribe to upon successful connection (make sure they are enabled and that you select the correct exchange type)
+* **Queue Subscriptions** - A list of direct queue subscriptions that the client will subscribe to upon successful connection (make sure they are enabled)
+
+Events:
+
+* **On Connected** - Occurs when the client successfully connects to the server
+* **On Disconnected** - Occurs when the client disconnects from the server
+* **On Blocked** - Occurs if the client is blocked by the server
+* **On Reconnecting** - Occurs each reconnection attempt made by the client when a connection becomes unavailable
+* **On Connection Error** - Occurs when the client experiences a connection error
+* **On Subscribed To Exchange** - Occurs when the client successfully subscribes to an exchange
+* **On Unsubscribed From Exchange** - Occurs when the client successfully unsubscribes from an exchange
+* **On Subscribed To Queue** - Occurs when the client successfully subscribes to a queue
+* **On Unsubscribed From Queue** - Occurs when the client successfully unsubscribes from a queue
+
 ## Thread Safety
 
 Unity's main game thread cannot directly interact with the thread(s) that the AMQP messaging functions occur on. If you try to call UnityEngine code directly from events that occur in the underlying AMQP client you will likely experience unhandled exceptions telling you such interactions are not allowed. The **AmqpClient** class (which subclasses MonoBehaviour) implements a thread-safe pattern. Within the **AmqpClient** class, client connection events (such as connect, disconnect, reconnect, blocked, subscribed, etc.) and received message events are quickly queued in thread-safe variables and then processed on the **Update()** method of **AmqpClient** to allow safe interaction with Unity's main game thread. Be aware of this limitation when working with this library.
