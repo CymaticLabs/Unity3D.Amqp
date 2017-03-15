@@ -16,6 +16,9 @@ This project offers the following:
 
 ## Table of Contents
 
+- [Introduction](#introduction)
+  - [Background](#background)
+  - [AMQP and Unity](#amqp-and-unity)
 - [Installation](#installation)
 - [Quick Start](#quick-start)
 - [Thread Safety](#thread-safety)
@@ -24,6 +27,30 @@ This project offers the following:
   - [.NET RabbitMQ client 3.4.4](#net-rabbitmq-client-344)
   - [Build Target Support](#unity-3d-build-targets)
 - [License](#license)
+
+## Introduction
+
+If you have made your way to this repository then you likely already know what [AMQP](http://www.amqp.org/) and [RabbitMQ](http://www.rabbitmq.com/) are and are simply looking to integrate an AMQP client into your [Unity 3D](https://unity3d.com/) project/game.
+
+### Background
+
+If you are not familiar with the AMQP protocol, the RabbitMQ message server and client, what messaging queuing is, or what a message bus is then a small introduction might be useful. The [tutorials](http://www.rabbitmq.com/getstarted.html) section of the RabbitMQ website is a good starting place to learn some of the patterns through examples.
+
+In simple terms AMQP is a messaging protocol used for [message queuing](https://en.wikipedia.org/wiki/Message_queue) and RabbitMQ is an client and server implementation of the AMQP protocol. You can think of email as a form of message queuing although it tends to be a lot more user/content focused and not as realtime-oriented as a protocol like AMQP. The basic idea is that clients send messages to a server (usually called a 'message broker' or just 'broker') which are published to a specific address (called an 'exchange' or 'queue') where they become available to be read (or 'consumed') by other clients. Unlike email, however, AMQP is much more focused on lightweight, realtime messages with arbitrary content defined by the application. It also shares a few similarities to HTTP such as configurable message headers.
+
+One of the main attractions to protocols like AMQP is the ability to implement useful messaging patterns such as [publish/subscribe](https://en.wikipedia.org/wiki/Publish%E2%80%93subscribe_pattern) and [work queues](https://www.rabbitmq.com/tutorials/tutorial-two-dotnet.html). Typically messages are published to exchanges on the server (sort of like email addresses) where they are then distributed to one or more message queues. Queues hold a copy of each message and the messages will wait in the queue in the order they were received until they are consumed and read by a client. Often there will be a unique queue per client which means that different clients can consume their own copy of the messages at different rates without affecting each other. Messages can be persisted to disk or just stored in memory. There are also advanced message routing capabilities for pattern-based routing using routing keys and other mechanisms.
+
+RabbitMQ is just one of many implementations of the AMQP protocol. It is a very mature and well documented open source implementation that is used by countless companies and projects to implement high-performance message routing systems.
+
+### AMQP and Unity
+
+Since Unity is built on Mono and supports .NET sockets as well as several network multiplayer options you might be asking what the point of using AMQP with Unity is. The most obvious answer is that you may want to connect Unity to existing AMQP systems.
+
+Writing your own TCP/UDP messaging system with .NET sockets is not a small undertaking. You will quickly find yourself reinventing the wheel at which point considering a technology like AMQP is a good choice. It has a considerable world-wide development effort behind it and used in many demanding commercial scenarios where realtime messaging is a critical component.
+
+Unity does have several network multiplayer options but these aren't always well suited for some of the messaging design patterns you might want to use in your project or game. For example you might want to create chat functionality (publish/subscribe pattern) that doesn't require players to start a network game session before they can chat with one another. Creating work queues where non-Unity services consume tasks and perform work (with the ability to ensure a work item is not lost if a worker crahses while performing the work) is another example.
+
+Unity's built-in network multiplayer system does not offer very sophisticated message routing options either, although it has some strengths that AMQP does not.
 
 ## Installation
 
