@@ -19,6 +19,17 @@ namespace CymaticLabs.Unity3D.Amqp
         public bool ConnectOnStart = true;
 
         /// <summary>
+        /// Whether or not to use relaxed SSL certificate validation for the broker.
+        /// </summary>
+        /// <remarks>
+        /// This can be useful since Unity's version of Mono (as of 5.x) has a very strict/buggy implementation
+        /// around SSL/TLS certificate validation. This can make the connection inherently less secure as it will
+        /// trust unverified certificates, but encrypted communications will work. This setting is applied on start 
+        /// and updating it during runtime will have no effect.
+        /// </remarks>
+        public bool RelaxedSslValidation = false;
+
+        /// <summary>
         /// Whether or not AMQP events will be written to the AMQP console.
         /// </summary>
         public bool WriteToConsole = false;
@@ -229,6 +240,9 @@ namespace CymaticLabs.Unity3D.Amqp
             {
                 queueSubscriptions.AddRange(QueueSubscriptions);
             }
+
+            // Apply SSL settings
+            SslHelper.RelaxedValidation = RelaxedSslValidation;
         }
 
         private void Start()

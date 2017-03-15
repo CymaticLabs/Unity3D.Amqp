@@ -10,15 +10,31 @@ namespace CymaticLabs.Unity3D.Amqp
     /// </summary>
     public static class SslHelper
     {
-        #region Constructor
+        #region Fields
 
-        static SslHelper()
+        // Whether or not to use relaxed SSL certificate validation
+        static bool relaxedValidation = false;
+
+        #endregion Fields
+
+        #region Properties
+
+        /// <summary>
+        /// Whether or not to use relaxed SSL certificate validation.
+        /// </summary>
+        public static bool RelaxedValidation
         {
-            // Setup custom SSL validation to avoid Mono SSL issues (slightly unsecure)
-            ServicePointManager.ServerCertificateValidationCallback = SslHelper.RemoteCertificateValidationCallback;
+            get { return relaxedValidation; }
+
+            set
+            {
+                if (relaxedValidation == value) return;
+                relaxedValidation = value;
+                ServicePointManager.ServerCertificateValidationCallback = relaxedValidation ? (RemoteCertificateValidationCallback)RemoteCertificateValidationCallback : null;
+            }
         }
 
-        #endregion Constructor
+        #endregion Properties
 
         #region Methods
 

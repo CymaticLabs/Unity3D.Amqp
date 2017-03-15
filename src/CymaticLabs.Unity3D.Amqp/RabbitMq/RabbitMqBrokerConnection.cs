@@ -274,11 +274,15 @@ namespace CymaticLabs.Unity3D.Amqp.RabbitMq
                         factory.Ssl.Enabled = AmqpPort == 5671 ? true : false;
                         factory.Ssl.ServerName = Server; // this is needed so that Mono won't have an exception when it's NULL
 
-                        // Add in custom SSL certificate validator so we have the ability to enable untrusted SSL certificates and deal with Mono issues
-                        factory.Ssl.CertificateValidationCallback = SslHelper.RemoteCertificateValidationCallback;
+                        // If relaxed SSL validation is set, apply relaxations (this helps with many Mono SSL certificate verification issues, but is less secure)
+                        if (SslHelper.RelaxedValidation)
+                        {
+                            // Add in custom SSL certificate validator so we have the ability to enable untrusted SSL certificates and deal with Mono issues
+                            factory.Ssl.CertificateValidationCallback = SslHelper.RemoteCertificateValidationCallback;
 
-                        // TODO Eventually allow requiring server name/cert matching to be configurable, for now disable enforcement
-                        factory.Ssl.AcceptablePolicyErrors = System.Net.Security.SslPolicyErrors.RemoteCertificateNameMismatch;
+                            // TODO Eventually expand the granularity of configurable policies
+                            factory.Ssl.AcceptablePolicyErrors = System.Net.Security.SslPolicyErrors.RemoteCertificateNameMismatch;
+                        }
 
                         // Create the connection for the connection
                         connection = factory.CreateConnection();
