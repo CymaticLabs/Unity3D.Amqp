@@ -19,6 +19,7 @@ This project offers the following:
 - [Installation](#installation)
 - [Quick Start](#quick-start)
 - [Thread Safety](#thread-safety)
+- [SSL Support](#ssl-support)
 - [Compatibility](#compatibility)
   - [.NET RabbitMQ client 3.4.4](#net-rabbitmq-client-344)
   - [Build Target Support](#unity-3d-build-targets)
@@ -43,6 +44,20 @@ Find the **AmqpClient** game object in the demo scene and familiarize yourself w
 ## Thread Safety
 
 Unity's main game thread cannot directly interact with the thread(s) that the AMQP messaging functions occur on. If you try to call UnityEngine code directly from events that occur in the underlying AMQP client you will likely experience unhandled exceptions telling you such interactions are not allowed. The **AmqpClient** class (which subclasses MonoBehaviour) implements a thread-safe pattern. Within the **AmqpClient** class, client connection events (such as connect, disconnect, reconnect, blocked, subscribed, etc.) and received message events are quickly queued in thread-safe variables and then processed on the **Update()** method of **AmqpClient** to allow safe interaction with Unity's main game thread. Be aware of this limitation when working with this library.
+
+## SSL Support
+
+SSL is supported with the AMQP client but there are several issues you will need to be aware of. Since Unity uses [Mono](http://www.mono-project.com/) you should be aware of [Mono's SSL/TLS support](http://www.mono-project.com/docs/faq/security/) as well as what it means for [RabbitMQ compatibility](https://www.rabbitmq.com/ssl.html#configuring-dotnet). Further compounding the issue is the fact that [Unity uses a forked version of Mono that tends to run way behind the latest code](http://answers.unity3d.com/questions/50013/httpwebrequestgetrequeststream-https-certificate-e.html). If you plan on working with SSL for secure AMQPS communication or HTTPS (used for some RabbitMQ broker REST API interaction) then you should try to familiarize yourself with the details.
+
+**Note:** If you want to use encrypted communications but certificate verification is not your ultimate concern then you can enable relaxed SSL verification by setting the **RelxaedSslVerficiation** Unity inspector property of AmqpClient to **True**. Or you can set it from code:
+
+```cs
+CymaticLabs.Unity3D.Amqp.SslHelper.RelaxedValidation = true;
+```
+
+Keep in mind that this is a global setting that **will relax all SSL certificate validation within the execution of your Unity project**. It is an easy way to enable encrypted communication **but not verifying the trust of an SSL certificate is a security concern and you should understand the implications of applying this setting**.
+
+That said not verifying an SSL certificate but still using SSL for communication is still theoretically better than not using encrypted communication at all. If verifying the trust of an SSL certificate is important to you then you will need to add the trusted certificates to Mono's trust store (which is separate than Window's native trust store). You may consider using the [mozroots.exe tool](http://answers.unity3d.com/questions/792342/how-to-validate-ssl-certificates-when-using-httpwe.html).
 
 ## Compatibility
 
