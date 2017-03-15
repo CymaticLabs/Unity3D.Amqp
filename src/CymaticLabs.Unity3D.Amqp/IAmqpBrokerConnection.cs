@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 
 namespace CymaticLabs.Unity3D.Amqp
 {
@@ -203,6 +204,33 @@ namespace CymaticLabs.Unity3D.Amqp
         #region Exchanges
 
         /// <summary>
+        /// Declares an exchange on the broker for the current virtual host.
+        /// </summary>
+        /// <param name="name">The name of the exchange to declare.</param>
+        /// <param name="type">The type of exchange to declare.</param>
+        /// <param name="durable">Whether or not the exchange should be durable.</param>
+        /// <param name="autoDelete">Whether or not the exchange will have auto-delete enabled.</param>
+        /// <param name="args">Optional exchange arguments.</param>
+        /// <returns>An Exception if one occurred during the operation, otherwise NULL.</returns>
+        Exception DeclareExchange(string name, AmqpExchangeTypes type, bool durable = true, bool autoDelete = false, IDictionary<string, object> args = null);
+
+        /// <summary>
+        /// Declares an exchange on the broker for the current virtual host.
+        /// </summary>
+        /// <param name="name">The name of the exchange to delete</param>
+        /// <param name="ifUnused">Only delete the exchange if it is currently unused.</param>
+        /// <returns>An Exception if one occurred during the operation, otherwise NULL.</returns>
+        Exception DeleteExchange(string name, bool ifUnused = false);
+
+        /// <summary>
+        /// Gets whether or not an exchange by a given name exists.
+        /// </summary>
+        /// <param name="name">The name of the exchange to check for.</param>
+        /// <param name="virtualHost">The optional virtual host to get exchanges for. If NULL the connection's default virtual host is used.</param>
+        /// <returns>True if the exchange exists, False if not.</returns>
+        bool ExchangeExists(string name, string virtualHost = null);
+
+        /// <summary>
         /// Gets a list of exchanges for the current connection.
         /// </summary>
         /// <param name="virtualHost">The optional virtual host to get exchanges for. If NULL the connection's default virtual host is used.</param>
@@ -212,6 +240,34 @@ namespace CymaticLabs.Unity3D.Amqp
         #endregion Exchanges
 
         #region Queues
+
+        /// <summary>
+        /// Declares a queue on the broker for the current virtual host.
+        /// </summary>
+        /// <param name="name">The name of the queue to declare.</param>
+        /// <param name="durable">Whether or not the queue should be durable.</param>
+        /// <param name="autoDelete">Whether or not the queue will have auto-delete enabled.</param>
+        /// <param name="exclusive">Whether or not the queue is exclusive.</param>
+        /// <param name="args">Optional exchange arguments.</param>
+        /// <returns>An Exception if one occurred during the operation, otherwise NULL.</returns>
+        Exception DeclareQueue(string name, bool durable = true, bool autoDelete = false, bool exclusive = false, IDictionary<string, object> args = null);
+
+        /// <summary>
+        /// Declares a queue on the broker for the current virtual host.
+        /// </summary>
+        /// <param name="name">The name of the queue to delete</param>
+        /// <param name="ifUnused">Only delete the queue if it is currently unused.</param>
+        /// <param name="ifEmpty">Only delete the queue if it is empty.</param>
+        /// <returns>An Exception if one occurred during the operation, otherwise NULL.</returns>
+        Exception DeleteQueue(string name, bool ifUnused = false, bool ifEmpty = false);
+
+        /// <summary>
+        /// Gets whether or not a queue by a given name exists.
+        /// </summary>
+        /// <param name="name">The name of the queue to check for.</param>
+        /// <param name="virtualHost">The optional virtual host to get queues for. If NULL the connection's default virtual host is used.</param>
+        /// <returns>True if the queue exists, False if not.</returns>
+        bool QueueExists(string name, string virtualHost = null);
 
         /// <summary>
         /// Gets a list of queues for the current connection.

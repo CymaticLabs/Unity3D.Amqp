@@ -708,6 +708,79 @@ namespace CymaticLabs.Unity3D.Amqp.RabbitMq
         #region Exchanges
 
         /// <summary>
+        /// Declares an exchange on the broker for the current virtual host.
+        /// </summary>
+        /// <param name="name">The name of the exchange to declare.</param>
+        /// <param name="type">The type of exchange to declare.</param>
+        /// <param name="durable">Whether or not the exchange should be durable.</param>
+        /// <param name="autoDelete">Whether or not the exchange will have auto-delete enabled.</param>
+        /// <param name="args">Optional exchange arguments.</param>
+        /// <returns>An Exception if one occurred during the operation, otherwise NULL.</returns>
+        public Exception DeclareExchange(string name, AmqpExchangeTypes type, bool durable = true, bool autoDelete = false, IDictionary<string, object> args = null)
+        {
+            if (IsConnected) throw new InvalidOperationException("Exchanges cannot be declared when disconnected");
+            if (string.IsNullOrEmpty(name)) throw new ArgumentNullException("name");
+
+            try
+            {
+                lock (Channel)
+                {
+                    Channel.ExchangeDeclare(name, type.ToString().ToLower(), durable, autoDelete, args);
+                }
+            }
+            catch (Exception ex)
+            {
+                return ex;
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Declares an exchange on the broker for the current virtual host.
+        /// </summary>
+        /// <param name="name">The name of the exchange to delete</param>
+        /// <param name="ifUnused">Only delete the exchange if it is currently unused.</param>
+        /// <returns>An Exception if one occurred during the operation, otherwise NULL.</returns>
+        public Exception DeleteExchange(string name, bool ifUnused = false)
+        {
+            if (IsConnected) throw new InvalidOperationException("Exchanges cannot be declared when disconnected");
+            if (string.IsNullOrEmpty(name)) throw new ArgumentNullException("name");
+
+            try
+            {
+                lock (Channel)
+                {
+                    Channel.ExchangeDelete(name, ifUnused);
+                }
+            }
+            catch (Exception ex)
+            {
+                return ex;
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Gets whether or not an exchange by a given name exists.
+        /// </summary>
+        /// <param name="name">The name of the exchange to check for.</param>
+        /// <param name="virtualHost">The optional virtual host to get exchanges for. If NULL the connection's default virtual host is used.</param>
+        /// <returns>True if the exchange exists, False if not.</returns>
+        public bool ExchangeExists(string name, string virtualHost = null)
+        {
+            if (string.IsNullOrEmpty(name)) throw new ArgumentNullException("name");
+
+            foreach (var exchange in GetExchanges(virtualHost))
+            {
+                if (exchange.Name == name) return true;
+            }
+
+            return false;
+        }
+
+        /// <summary>
         /// Gets a list of exchanges for the current connection.
         /// </summary>
         /// <param name="virtualHost">The optional virtual host to get exchanges for. If NULL the connection's default virtual host is used.</param>
@@ -756,6 +829,80 @@ namespace CymaticLabs.Unity3D.Amqp.RabbitMq
         #endregion Exchanges
 
         #region Queues
+
+        /// <summary>
+        /// Declares a queue on the broker for the current virtual host.
+        /// </summary>
+        /// <param name="name">The name of the queue to declare.</param>
+        /// <param name="durable">Whether or not the queue should be durable.</param>
+        /// <param name="autoDelete">Whether or not the queue will have auto-delete enabled.</param>
+        /// <param name="exclusive">Whether or not the queue is exclusive.</param>
+        /// <param name="args">Optional exchange arguments.</param>
+        /// <returns>An Exception if one occurred during the operation, otherwise NULL.</returns>
+        public Exception DeclareQueue(string name, bool durable = true, bool autoDelete = false, bool exclusive = false, IDictionary<string, object> args = null)
+        {
+            if (IsConnected) throw new InvalidOperationException("Exchanges cannot be declared when disconnected");
+            if (string.IsNullOrEmpty(name)) throw new ArgumentNullException("name");
+
+            try
+            {
+                lock (Channel)
+                {
+                    Channel.QueueDeclare(name, durable, exclusive, autoDelete, args);
+                }
+            }
+            catch (Exception ex)
+            {
+                return ex;
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Declares a queue on the broker for the current virtual host.
+        /// </summary>
+        /// <param name="name">The name of the queue to delete</param>
+        /// <param name="ifUnused">Only delete the queue if it is currently unused.</param>
+        /// <param name="ifEmpty">Only delete the queue if it is empty.</param>
+        /// <returns>An Exception if one occurred during the operation, otherwise NULL.</returns>
+        public Exception DeleteQueue(string name, bool ifUnused = false, bool ifEmpty = false)
+        {
+            if (IsConnected) throw new InvalidOperationException("Exchanges cannot be declared when disconnected");
+            if (string.IsNullOrEmpty(name)) throw new ArgumentNullException("name");
+
+            try
+            {
+                lock (Channel)
+                {
+                    Channel.QueueDelete(name, ifUnused, ifEmpty);
+                }
+            }
+            catch (Exception ex)
+            {
+                return ex;
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Gets whether or not a queue by a given name exists.
+        /// </summary>
+        /// <param name="name">The name of the queue to check for.</param>
+        /// <param name="virtualHost">The optional virtual host to get queues for. If NULL the connection's default virtual host is used.</param>
+        /// <returns>True if the queue exists, False if not.</returns>
+        public bool QueueExists(string name, string virtualHost = null)
+        {
+            if (string.IsNullOrEmpty(name)) throw new ArgumentNullException("name");
+
+            foreach (var queue in GetQueues(virtualHost))
+            {
+                if (queue.Name == name) return true;
+            }
+
+            return false;
+        }
 
         /// <summary>
         /// Gets a list of queues for the current connection.
