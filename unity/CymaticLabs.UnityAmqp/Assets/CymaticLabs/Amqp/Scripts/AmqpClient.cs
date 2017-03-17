@@ -1,8 +1,10 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.IO;
 using UnityEngine;
 using UnityEngine.Events;
+using CymaticLabs.Unity3D.Amqp.SimpleJSON;
 using CymaticLabs.Unity3D.Amqp.UI;
 
 namespace CymaticLabs.Unity3D.Amqp
@@ -15,8 +17,15 @@ namespace CymaticLabs.Unity3D.Amqp
         #region Inspector
 
         /// <summary>
+        /// The name of the connection to use.
+        /// </summary>
+        [HideInInspector]
+        public string Connection;
+
+        /// <summary>
         /// Whether or not to connect to the messaging broker on start.
         /// </summary>
+        [Tooltip("Whether or not to connect to the messaging broker on start.")]
         public bool ConnectOnStart = true;
 
         /// <summary>
@@ -28,66 +37,21 @@ namespace CymaticLabs.Unity3D.Amqp
         /// trust unverified certificates, but encrypted communications will work. This setting is applied on start 
         /// and updating it during runtime will have no effect.
         /// </remarks>
+        [Tooltip("Whether or not to use relaxed SSL certificate validation for the broker. Server SSL certificates will not be verified but encryption will be used.")]
         public bool RelaxedSslValidation = false;
 
         /// <summary>
         /// Whether or not AMQP events will be written to the AMQP console.
         /// </summary>
+        [Tooltip("Whether or not AMQP events will be written to the AMQP console.")]
         public bool WriteToConsole = false;
-
-        /// <summary>
-        /// The message broker host.
-        /// </summary>
-        public string Host;
-
-        /// <summary>
-        /// The message broker AMQP port.
-        /// </summary>
-        public int AmqpPort = 5672;
-
-        /// <summary>
-        /// The message broker web/REST port.
-        /// </summary>
-        public int WebPort = 80;
-
-        /// <summary>
-        /// The message broker's virtual host to use.
-        /// </summary>
-        public string VirtualHost;
-
-        /// <summary>
-        /// The username to use.
-        /// </summary>
-        public string Username;
-
-        /// <summary>
-        /// The password to use.
-        /// </summary>
-        public string Password;
-
-        /// <summary>
-        /// The interval in seconds for reconnection attempts.
-        /// </summary>
-        public short ReconnectInterval = 5;
-
-        /// <summary>
-        /// The requested keep-alive heartbeat in seconds.
-        /// </summary>
-        public ushort RequestedHeartBeat = 30;
-
-        /// <summary>
-        /// The list of exchange subscriptions to use.
-        /// </summary>
-        public UnityAmqpExchangeSubscription[] ExchangeSubscriptions;
-
-        /// <summary>
-        /// The list of queue subscriptions to use.
-        /// </summary>
-        public UnityAmqpQueueSubscription[] QueueSubscriptions;
 
         #endregion Inspector
 
         #region Fields
+
+        // The text asset that contains the AMQP configuration data
+        TextAsset configJson;
 
         // The internal message broker client
         IAmqpBrokerConnection client;
@@ -106,6 +70,9 @@ namespace CymaticLabs.Unity3D.Amqp
 
         // Flag to tell when the client is attempting to reconnect to the host
         bool isReconnecting = false;
+
+        // List of available connections
+        static List<AmqpConnection> connections = new List<AmqpConnection>();
 
         // List of exchange-based subscriptions
         List<AmqpExchangeSubscription> exSubscriptions;
@@ -137,6 +104,39 @@ namespace CymaticLabs.Unity3D.Amqp
         // Whether or not the application is currently quitting
         bool isQuitting = false;
 
+        // The name of the connection to use.
+        string Name;
+
+        /// The message broker host.
+        string Host;
+
+        /// The message broker AMQP port.
+        int AmqpPort = 5672;
+
+        /// The message broker web/REST port.
+        int WebPort = 80;
+
+        /// The message broker's virtual host to use.
+        string VirtualHost;
+
+        /// The username to use.
+        string Username;
+
+        /// The password to use.
+        string Password;
+
+        /// The interval in seconds for reconnection attempts.
+        short ReconnectInterval = 5;
+
+        /// The requested keep-alive heartbeat in seconds.
+        ushort RequestedHeartBeat = 30;
+
+        /// The list of exchange subscriptions to use.
+        UnityAmqpExchangeSubscription[] ExchangeSubscriptions;
+
+        /// The list of queue subscriptions to use.
+        UnityAmqpQueueSubscription[] QueueSubscriptions;
+
         #endregion Fields
 
         #region Properties
@@ -157,6 +157,14 @@ namespace CymaticLabs.Unity3D.Amqp
         public bool IsConnected
         {
             get { return client != null ? client.IsConnected : false; }
+        }
+
+        /// <summary>
+        /// Gets the file name for the AMQP connections data.
+        /// </summary>
+        public static string ConfigurationFilename
+        {
+            get { return "AmqpConfiguration.json"; }
         }
 
         #endregion Properties
@@ -226,6 +234,7 @@ namespace CymaticLabs.Unity3D.Amqp
             unsubscribedExchanges = new Queue<AmqpExchangeSubscription>();
             subscribedQueues = new Queue<AmqpQueueSubscription>();
             unsubscribedQueues = new Queue<AmqpQueueSubscription>();
+            connections = new List<AmqpConnection>();
 
             // Assign singleton instance
             Instance = this;
@@ -244,6 +253,34 @@ namespace CymaticLabs.Unity3D.Amqp
 
             // Apply SSL settings
             SslHelper.RelaxedValidation = RelaxedSslValidation;
+
+            // Look for connections file
+            configJson = Resources.Load<TextAsset>(ConfigurationFilename.Replace(".json", ""));
+
+            if (configJson == null)
+            {
+                Debug.LogErrorFormat("AMQP JSON configuration asset not found: {0}", ConfigurationFilename);
+                return;
+            }
+            
+            // Parse connection JSON data
+            try
+            {
+                var config = JSON.Parse(configJson.text).AsObject;
+                var jsonConnections = config["Connections"].AsArray;
+
+                // Populate the connection list from the data
+                for (int i = 0; i < jsonConnections.Count; i++)
+                {
+                    var c = AmqpConnection.FromJsonObject(jsonConnections[i].AsObject);
+                    connections.Add(c);
+                }
+                    
+            }
+            catch (Exception ex)
+            {
+                Debug.LogErrorFormat("{0}", ex);
+            }
         }
 
         private void Start()
@@ -491,6 +528,32 @@ namespace CymaticLabs.Unity3D.Amqp
         #region Connection
 
         /// <summary>
+        /// Gets the current list of connections.
+        /// </summary>
+        /// <returns>An array of the current AMQP connections.</returns>
+        public static AmqpConnection[] GetConnections()
+        {
+            return connections.ToArray();
+        }
+
+        /// <summary>
+        /// Gets a connection by name if it exists.
+        /// </summary>
+        /// <param name="name">The name of the connection to get.</param>
+        /// <returns>The connection if it is found, otherwise NULL.</returns>
+        public static AmqpConnection GetConnection(string name)
+        {
+            if (string.IsNullOrEmpty(name)) throw new ArgumentNullException("name");
+
+            foreach (var c in connections)
+            {
+                if (c.Name == name) return c;
+            }
+
+            return null;
+        }
+
+        /// <summary>
         /// Connects to the messaging broker.
         /// </summary>
         public static void Connect()
@@ -522,6 +585,21 @@ namespace CymaticLabs.Unity3D.Amqp
                 client.UnsubscribedFromExchange -= Client_UnsubscribedFromExchange;
                 client.SubscribedToQueue -= Client_SubscribedToQueue;
                 client.UnsubscribedFromQueue -= Client_UnsubscribedFromQueue;
+            }
+
+            // Find the connection by name
+            var c = GetConnection(Connection);
+
+            if (c != null)
+            {
+                Host = c.Host;
+                AmqpPort = c.AmqpPort;
+                WebPort = c.WebPort;
+                VirtualHost = c.VirtualHost;
+                Username = c.Username;
+                Password = c.Password;
+                ReconnectInterval = c.ReconnectInterval;
+                RequestedHeartBeat = c.RequestedHeartBeat;
             }
 
             // Create the client for the connection
@@ -1206,7 +1284,7 @@ namespace CymaticLabs.Unity3D.Amqp
             // Decode as text
             var payload = System.Text.Encoding.UTF8.GetString(message.Body);
             AmqpConsole.Color = new Color(1f, 0.5f, 0);
-            Log("Message received on {0} => {1}", subscription.ExchangeName + ":" + subscription.RoutingKey, payload);
+            Log("Message received on {0}: {1}", subscription.ExchangeName + (!string.IsNullOrEmpty(message.RoutingKey) ? ":" + message.RoutingKey : ""), payload);
             AmqpConsole.Color = null;
         }
 
@@ -1220,7 +1298,7 @@ namespace CymaticLabs.Unity3D.Amqp
             // Decode as text
             var payload = System.Text.Encoding.UTF8.GetString(message.Body);
             AmqpConsole.Color = new Color(1f, 0.5f, 0);
-            Log("Message received on {0} => {1}", subscription.QueueName, payload);
+            Log("Message received on {0}: {1}", subscription.QueueName, payload);
             AmqpConsole.Color = null;
         }
 

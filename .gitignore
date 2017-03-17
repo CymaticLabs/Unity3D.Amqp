@@ -35,7 +35,7 @@
 **/[Bb]in/
 *.suo
 *.user
-.vs/config/applicationhost.config
+**/.vs/config/applicationhost.config
 **/src/*.Testing/*.xml
 
 # Unity3D generated meta files
@@ -47,3 +47,6 @@ sysinfo.txt
 # Builds
 *.apk
 # *.unitypackage
+
+# AMQP
+AmqpConfiguration.json*

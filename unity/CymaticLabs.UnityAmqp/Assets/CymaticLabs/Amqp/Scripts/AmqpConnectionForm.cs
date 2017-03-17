@@ -12,13 +12,7 @@ namespace CymaticLabs.Unity3D.Amqp.UI
     {
         #region Inspector
 
-        // Form inputs
-        public InputField Host;
-        public InputField AmqpPort;
-        public InputField WebPort;
-        public InputField VirtualHost;
-        public InputField Username;
-        public InputField Password;
+        public Dropdown Connection;
         public Button ConnectButton;
         public Button DisconnectButton;
 
@@ -55,12 +49,7 @@ namespace CymaticLabs.Unity3D.Amqp.UI
         private void Awake()
         {
             exSubscriptions = new List<AmqpExchangeSubscription>();
-            if (Host == null) Debug.LogError("AmqpConnectionForm.Host is not assigned");
-            if (AmqpPort == null) Debug.LogError("AmqpConnectionForm.AmqpPort is not assigned");
-            if (WebPort == null) Debug.LogError("AmqpConnectionForm.WebPort is not assigned");
-            if (VirtualHost == null) Debug.LogError("AmqpConnectionForm.VirtualHost is not assigned");
-            if (Username == null) Debug.LogError("AmqpConnectionForm.Username is not assigned");
-            if (Password == null) Debug.LogError("AmqpConnectionForm.Password is not assigned");
+            if (Connection == null) Debug.LogError("AmqpConnectionForm.Connection is not assigned");
             if (ExchangeName == null) Debug.LogError("AmqpConnectionForm.ExchangeName is not assigned");
             if (RoutingKey == null) Debug.LogError("AmqpConnectionForm.RoutingKey is not assigned");
             if (SubscribeButton == null) Debug.LogError("AmqpConnectionForm.SubscribeButton is not assigned");
@@ -80,14 +69,24 @@ namespace CymaticLabs.Unity3D.Amqp.UI
             AmqpClient.Instance.OnSubscribedToExchange.AddListener(HandleExchangeSubscribed);
             AmqpClient.Instance.OnUnsubscribedFromExchange.AddListener(HandleExchangeUnsubscribed);
 
-            // Copy values from AmqpClient instance
-            var i = AmqpClient.Instance;
-            Host.text = i.Host;
-            AmqpPort.text = i.AmqpPort.ToString();
-            WebPort.text = i.WebPort.ToString();
-            VirtualHost.text = i.VirtualHost;
-            Username.text = i.Username;
-            Password.text = i.Password;
+            // Populate the connections drop down
+            foreach (var c in AmqpClient.GetConnections())
+            {
+                var option = new Dropdown.OptionData(c.Name);
+                Connection.options.Add(option);
+            }
+
+            // Select the initial item in the dropdown
+            for (var i = 0; i < Connection.options.Count; i++)
+            {
+                if (Connection.options[i].text == AmqpClient.Instance.Connection)
+                {
+                    Connection.value = i;
+                    break;
+                }
+            }
+
+            Connection.RefreshShownValue();
         }
 
         #endregion Init
@@ -101,73 +100,12 @@ namespace CymaticLabs.Unity3D.Amqp.UI
         /// </summary>
         public void Connect()
         {
-            // Validate args
-            var isValid = true;
-            int amqpPort = 5672, webPort = 80;
-
-            if (string.IsNullOrEmpty(Host.text))
-            {
-                isValid = false;
-                AmqpConsole.Color = Color.red;
-                AmqpConsole.WriteLine("* Host cannot be blank");
-                AmqpConsole.Color = null;
-            }
-
-            if (string.IsNullOrEmpty(AmqpPort.text))
-            {
-                isValid = false;
-                AmqpConsole.Color = Color.red;
-                AmqpConsole.WriteLine("* AMQP Port cannot be blank");
-                AmqpConsole.Color = null;
-            }
-
-            if (isValid && !int.TryParse(AmqpPort.text, out amqpPort))
-            {
-                isValid = false;
-                AmqpConsole.Color = Color.red;
-                AmqpConsole.WriteLineFormat("* AMQP Port is not a valid port number: {0}", AmqpPort.text);
-                AmqpConsole.Color = null;
-            }
-
-            if (string.IsNullOrEmpty(WebPort.text))
-            {
-                isValid = false;
-                AmqpConsole.Color = Color.red;
-                AmqpConsole.WriteLine("* Web Port cannot be blank");
-                AmqpConsole.Color = null;
-            }
-
-            if (isValid && !int.TryParse(WebPort.text, out webPort))
-            {
-                isValid = false;
-                AmqpConsole.Color = Color.red;
-                AmqpConsole.WriteLineFormat("* Web Port is not a valid port number: {0}", WebPort.text);
-                AmqpConsole.Color = null;
-            }
-
-            // Don't continue if values are invald
-            if (!isValid) return;
-
-            // Ensure a default virtual host
-            if (string.IsNullOrEmpty(VirtualHost.text))
-            {
-                VirtualHost.text = "/";
-            }
-
-            // Clear subscriptions
-            exSubscriptions.Clear();
-
-            // Assign values
-            AmqpClient.Instance.Host = Host.text;
-            AmqpClient.Instance.AmqpPort = amqpPort;
-            AmqpClient.Instance.WebPort = webPort;
-            AmqpClient.Instance.VirtualHost = VirtualHost.text;
-            AmqpClient.Instance.Username = Username.text;
-            AmqpClient.Instance.Password = Password.text;
-
             // Connect
             ExchangeName.options.Clear();
             PublishExchange.options.Clear();
+
+            var connectionName = Connection.options[Connection.value].text;
+            AmqpClient.Instance.Connection = connectionName;
 
             AmqpClient.Connect();
             AmqpConsole.Instance.Focus();
@@ -353,12 +291,7 @@ namespace CymaticLabs.Unity3D.Amqp.UI
         // Handles a connection event
         void HandleConnected()
         {
-            Host.readOnly = true;
-            AmqpPort.readOnly = true;
-            WebPort.readOnly = true;
-            VirtualHost.readOnly = true;
-            Username.readOnly = true;
-            Password.readOnly = true;
+            Connection.interactable = false;
             ConnectButton.interactable = false;
             DisconnectButton.interactable = true;
 
@@ -393,12 +326,7 @@ namespace CymaticLabs.Unity3D.Amqp.UI
         // Handles a disconnection event
         void HandleDisconnected()
         {
-            Host.readOnly = false;
-            AmqpPort.readOnly = false;
-            WebPort.readOnly = false;
-            VirtualHost.readOnly = false;
-            Username.readOnly = false;
-            Password.readOnly = false;
+            Connection.interactable = true;
             ConnectButton.interactable = true;
             DisconnectButton.interactable = false;
 
