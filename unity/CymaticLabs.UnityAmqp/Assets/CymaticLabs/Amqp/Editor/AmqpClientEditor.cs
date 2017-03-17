@@ -69,7 +69,7 @@ namespace CymaticLabs.Unity3D.Amqp
 
             // Connections drop down
             string tooltip = "Select the AMQP connection to use. Connections can be configured in the AMQP/Configuration menu.";
-            index = EditorGUILayout.Popup(new GUIContent("Connections", tooltip), index, options.ToArray());
+            index = EditorGUILayout.Popup(new GUIContent("Connection", tooltip), index, options.ToArray());
 
             // If the index has changed, record the change
             if (index != lastIndex) Undo.RecordObject(target, "Undo Connection change");
