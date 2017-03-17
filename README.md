@@ -8,7 +8,7 @@ Attempts to track down other integrations of AMQP clients into Unity 3D all came
 **Note:** This project is very new so the documentation will probably be a bit sparse until there is more time to build it up. The project will also be constantly adding features and may including breaking changes. The code is fairly well documented however so if you feel like just diving in and trying to make sense of it - go for it! It will still be easier than trying from scratch to get AMQP support in Unity.
 
 This project offers the following:
-* A Unity asset package that can be imported into Unity projects made with Unity 5.x+ that provides easy AMQP client integration (tested with Windows and MacOS builds so far, Linux will likely work too)
+* A Unity asset package that can be imported into Unity projects made with Unity 5.x+ that provides easy AMQP client integration (tested with Windows, macOS, and Anrdoid builds so far, Linux will likely work too, iOS planned)
 * A custom .NET library that wraps the RabbitMQ client and provides extensibility for integrating other AMQP clients beyond RabbitMQ .NET if necessary
 * A thread-safe pattern that plays nice with Unity's game thread (out of the box the .NET RabbitMQ client cannot directly interact with Unity's game thread)
 * Unity C# source files that provide Unity-specific classes and MonoBehaviour scripts for working with AMQP including a useful diagnostics console
@@ -25,7 +25,7 @@ This project offers the following:
 - [SSL Support](#ssl-support)
 - [Compatibility](#compatibility)
   - [.NET RabbitMQ client 3.4.4](#net-rabbitmq-client-344)
-  - [Build Target Support](#unity-3d-build-targets)
+  - [Unity 3D Build Support](#unity-3d-build-support)
 - [License](#license)
 
 ## Introduction
@@ -182,11 +182,17 @@ The version of the RabbitMQ client library that is in the **/lib** folder of thi
 
 The **CymaticLabs.Unity3D.Amqp** project references the local 3.4.4 client projects directly. This is useful if you need to debug the RabbitMQ client library itself (including break points). Also there seems to be no official nuget package for 3.4.4, only 3.4.3 and 3.5.0; so this project includes the additional bug fixes of 3.4.4.
 
-### Unity 3D Build Targets
+### Unity 3D Build Support
 
-Presently this project has only been tested against Windows and MacOS (and not all versions). Since the MacOS Mono version works, it is likely it will also work for Linux builds.
+This library has been successfully tested for the follow platforms/builds:
 
-Android and iOS support are definitely on the roadmap. Hopefully things will work as-is, but if not there at least seems like some alternative routes to get things working. For Android [this github project](https://github.com/codeMonkeyWang/Unity-RabbitMQ) provides some clues. [This post about Xamarin integration](https://forums.xamarin.com/discussion/49858/using-rabbitmq-amqp-with-xamarin-forms) also seems to provide some clues and makes support seem likely.
+* Windows 10 (native, not UWP - UWP will likely not work without modification)
+* macOS El Capitan
+* Android 7.0
+
+This library is likely compatible with other versions of Windows, macOS, and Android, but they just hasn't been tested yet. Linux and iOS might work as well but also have not been tested (if you end up trying and it works, please let me know). Since macOS with Mono works, it is likely that Linux builds will work without any modification.
+
+iOS support is definitely on the roadmap. Hopefully things will work as-is when it comes time to test, but if not there at least some clues that provide hope it should be possible. [This post about Xamarin integration](https://forums.xamarin.com/discussion/49858/using-rabbitmq-amqp-with-xamarin-forms) hints it should work.
 
 ## License
 
