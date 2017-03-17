@@ -64,21 +64,52 @@ The fastest way to get up and running with AMQP in your Unity project is to just
 
 **Note:** If you don't want to download the whole project and just want to work with the asset package you can download it from the [releases section](https://github.com/CymaticLabs/Unity3D.Amqp/releases) of the project.
 
-For an example of how to work with the library, open the **AmqpDemo** scene found at **/Assets/CymaticLabs/Amqp/Scenes/** in the Unity project you imported it into.
+Start a new project or open a project you'd like to import the library into. Once you've done that import **CymaticLabsUnityAmqp.unitypacakge** into your project:
 
-Find the **AmqpClient** game object in the demo scene and familiarize yourself with the **AmqpClient.cs** script. This MonoBehaviour is the main way to interface with an AMQP broker from Unity. It exposes events and methods for connecting, disconnecting, subscribing, and publishing to an AMQP broker. If you only need a single broker connection it has convenient static methods or you can create multiple instances for multiple connections.
+![import custom package](docs/img/amqp-client-import-1.png)
 
-You can look for the **AmqpClient** prefab or just drag the script onto a GameObject in your scene. Here's what it looks like in the inspector:
+![import library asset package](docs/img/amqp-client-import-2.png)
 
-![AmqpClient in Unity Inspector](docs/img/amqp-client-inspector-1.png)
+Once the asset package has been imported, locate and load the **AmqpDemo** scene:
 
-**Note:** The follow explanation pertains to RabbitMQ servers specifically. Your mileage may vary with other AMQP servers/brokers. The Web Port and exchange/queue descovery methods are specifically implemented for RabbitMQ servers and will probably fail with other hosts.
+![open demo scene](docs/img/amqp-client-demo-1.png)
 
-Here's a quick description of the script's inspector properties:
+Before you can use the library you will need to do an initial setup of the AMQP configuration. To do this, open the AMQP configuration editor window:
 
-* **Connect On Start** - When enabled the script will attempt to establish a connection to the AMQP server on Start()
-* **Relaxed Ssl Validation** - When enabled SSL certificate validation from the AMQP server will be relaxed ([see details](#ssl-support))
-* **Write To Console** - When enabled important AMQP log details will be written to the included AmqpConsole class/prefab (optional)
+![setup AMQP configuration](docs/img/amqp-client-demo-2.png)
+
+The AMQP configuration editor window is where you will configure the AMQP connections that your Unity project will use. Opening the editor for the first time will create a text asset configuration file that will be used by the project. By default it contains a single connection which is configured for the default install of [RabbitMQ server](http://www.rabbitmq.com/download.html) running on localhost which is useful for local development and testing.
+
+**Note:** The this library pertains to RabbitMQ servers specifically. Your mileage may vary with other AMQP servers/brokers. The Web Port and exchange/queue descovery methods are specifically implemented for RabbitMQ servers and will probably fail with other hosts.
+
+![AMQP configuration editor](docs/img/amqp-client-demo-3.png)
+
+Ensure that you see the AMQP configuration file created by the editor. You can edit this file manually if that's easier for some reason, but it is recommended you use the AMQP configuration editor window instead. Connections must have a unique name so if you edit the file by hand keep that in mind. The configuration file should live in **Assets/Resources** in your project. The file provides a convenient way to transfer commonly used connections between multiple Unity projects by copying and pasting the file from one project to another.
+
+![verify the configuration file](docs/img/amqp-client-demo-4.png)
+
+Assuming you have installed RabbitMQ server locally with the default settings you can now play the demo scene and you should see a single connection in the Conneciton drop down to the left of the demo scene's UI. Press the **Connect** button to connect to your local RabbitMQ server.
+
+![connect to a server](docs/img/amqp-client-demo-5.png)
+
+To test a basic "echo" scenario to ensure messages are flowing between Unity and RabbitMQ server subscribe to an exchange in the Subscriptions section of the form. Select **"amq.topic"** and leave the routing key blank, then hit the **Subscribe** button.
+
+After you have subscribed, select the same **"amq.topic"** in the **Publish** area drop down. Leave the routing key blank, type a text message to send in the **Message** text input, and then hit the **Send** button. You should see your message echoed back in the demo scene's console below.
+
+![test with the server](docs/img/amqp-client-demo-6.png)
+
+To add or update connections open the AMQP configuration editor window again.
+
+* To update a connection, leave its name the same but update its connection details and then hit the **Save** button
+* To add a new connection, just ensure you give it a unique name in the connection details form, then hit the **Save** button; it should now appear in the **Connection** drop downs and in the configuration file
+* To delete a connection, select it from the editor's drop down and press the **Delete** button
+
+In the following example we add new connection to [CloudAMQP](https://www.cloudamqp.com/) who offer a free tier of hosted RabbitMQ server:
+
+![add a new connection](docs/img/amqp-client-demo-7.png)
+
+The following is an explaination of a connection's properties:
+
 * **Host** - The host address of the AMQP server to connect to
 * **Amqp Port** - The AMQP protocol port number on the host to connect to (5672 is default unencrypted, 5671 is default encrypted)
 * **Web Port** - The web port number on the host to connect to that is used for exchange/queue discovery (for local RabbitMQ server 15672 is default, 80 is default for unencrypted, and 443 is default for encrypted) 
@@ -86,6 +117,25 @@ Here's a quick description of the script's inspector properties:
 * **Username** - The client username to use when connecting to the AMQP server
 * **Password** - The client password to use when connecting to the AMQP server
 * **Reconnect Interval** - The number of seconds to wait inbetween connection retries when the connection to the server fails (1 second minimum)
+
+Once you've added an additional connection it should show up in the demo scene's drop down when you play it and you should be able to connect to the new server instead of your localhost:
+
+![additional connections](docs/img/amqp-client-demo-8.png)
+
+**Note:** If you are attempting to connect to a hosted RabbitMQ server like CloudAMQP keep in mind the **AMQP Port** and **Web Port** configuration will matter. For example CloudAMQP supports both 5672 (unencrypted) and 5671 (encrypted) for AMQP but only 443 (encrypted) for HTTP/web communication. If you need to use encrypted communication you should read about [SSL support](#ssl-support).
+
+Finally, find the **AmqpClient** game object in the demo scene and familiarize yourself with the **AmqpClient.cs** script. This MonoBehaviour is the main way to interface with an AMQP broker from Unity. It exposes events and methods for connecting, disconnecting, subscribing, and publishing to an AMQP broker. If you only need a single broker connection it has convenient static methods or you can create multiple instances for multiple connections.
+
+You can look for the **AmqpClient** prefab or just drag the script onto a GameObject in your scene. Here's what it looks like in the inspector:
+
+![AmqpClient in Unity Inspector](docs/img/amqp-client-inspector-1.png)
+
+Here's a quick description of the script's inspector properties:
+
+* **Connection** - The AMQP connection to use that was configured with the AMQP configuration editor
+* **Connect On Start** - When enabled the script will attempt to establish a connection to the AMQP server on Start()
+* **Relaxed Ssl Validation** - When enabled SSL certificate validation from the AMQP server will be relaxed ([see details](#ssl-support))
+* **Write To Console** - When enabled important AMQP log details will be written to the included AmqpConsole class/prefab (optional)
 * **Requested Heart Beat** - The number of seconds of the requested connection keep-alive heart beat.
 * **Exchange Subscriptions** - A list of exchange subscriptions that the client will subscribe to upon successful connection (make sure they are enabled and that you select the correct exchange type)
 * **Queue Subscriptions** - A list of direct queue subscriptions that the client will subscribe to upon successful connection (make sure they are enabled)
