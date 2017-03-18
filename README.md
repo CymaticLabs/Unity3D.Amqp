@@ -19,13 +19,13 @@ This project offers the following:
 - [Introduction](#introduction)
   - [Background](#background)
   - [AMQP and Unity](#amqp-and-unity)
+- [Compatibility](#compatibility)
+  - [.NET RabbitMQ client 3.4.4](#net-rabbitmq-client-344)
+  - [Unity 3D Build Support](#unity-3d-build-support)  
 - [Installation](#installation)
 - [Quick Start](#quick-start)
 - [Thread Safety](#thread-safety)
 - [SSL Support](#ssl-support)
-- [Compatibility](#compatibility)
-  - [.NET RabbitMQ client 3.4.4](#net-rabbitmq-client-344)
-  - [Unity 3D Build Support](#unity-3d-build-support)
 - [License](#license)
 
 ## Introduction
@@ -51,6 +51,30 @@ Writing your own TCP/UDP messaging system with .NET sockets is not a small under
 Unity does have several network multiplayer options but these aren't always well suited for some of the messaging design patterns you might want to use in your project or game. For example you might want to create chat functionality (publish/subscribe pattern) that doesn't require players to start a network game session before they can chat with one another. Creating work queues where non-Unity services consume tasks and perform work (with the ability to ensure a work item is not lost if a worker crahses while performing the work) is another example.
 
 Unity's built-in network multiplayer system does not offer very sophisticated message routing options either, although it has some strengths that AMQP does not.
+
+## Compatibility
+
+### .NET RabbitMQ client 3.4.4
+
+Quite a few issues exist when attempting to integrate AMQP with Unity, specifically with the official .NET RabbitMQ client. Since Unity  (as of version 5.5.1) still only supports .NET Framework 3.5 that means that a specific version of the .NET RabbitMQ client must be used. The last version to support .NET 3.5 is version 3.4.4 of the RabbitMQ client. Any version greather than 3.4.4 is not compatible with Unity.
+
+Building version 3.4.4 has a few issues. It's an archived version at this point so first you must track it down in the official git repository for the client. Also it was built with Visual Studio 2008 and when opening the project in Visual Studio 2015 the upgrade fails with errors. The [build instructions](http://www.rabbitmq.com/build-dotnet-client.html) on RabbitMQ's offical website are no longer accurate to version 3.4.4 and it was difficult to track them down. The [internet archive](https://archive.org/) fortunately yielded a page with build instructions.
+
+The version of the RabbitMQ client library that is in the **/lib** folder of this project has already been upgraded and will open and build properly in Visual Studio 2015.
+
+The **CymaticLabs.Unity3D.Amqp** project references the local 3.4.4 client projects directly. This is useful if you need to debug the RabbitMQ client library itself (including break points). Also there seems to be no official nuget package for 3.4.4, only 3.4.3 and 3.5.0; so this project includes the additional bug fixes of 3.4.4.
+
+### Unity 3D Build Support
+
+This library has been successfully tested for the follow platforms/builds:
+
+* Windows 10 (native, not UWP - UWP will likely not work without modification)
+* macOS El Capitan
+* Android 7.0
+
+This library is likely compatible with other versions of Windows, macOS, and Android, but they just hasn't been tested yet. Linux and iOS might work as well but also have not been tested (if you end up trying and it works, please let me know). Since macOS with Mono works, it is likely that Linux builds will work without any modification.
+
+iOS support is definitely on the roadmap. Hopefully things will work as-is when it comes time to test, but if not there at least some clues that provide hope it should be possible. [This post about Xamarin integration](https://forums.xamarin.com/discussion/49858/using-rabbitmq-amqp-with-xamarin-forms) hints it should work.
 
 ## Installation
 
@@ -169,30 +193,6 @@ CymaticLabs.Unity3D.Amqp.SslHelper.RelaxedValidation = true;
 Keep in mind that this is a global setting that **will relax all SSL certificate validation within the execution of your Unity project**. It is an easy way to enable encrypted communication **but not verifying the trust of an SSL certificate is a security concern and you should understand the implications of applying this setting**.
 
 That said not verifying an SSL certificate but still using SSL for communication is still theoretically better than not using encrypted communication at all. If verifying the trust of an SSL certificate is important to you then you will need to add the trusted certificates to Mono's trust store (which is separate than Window's native trust store). You may consider using the [mozroots.exe tool](http://answers.unity3d.com/questions/792342/how-to-validate-ssl-certificates-when-using-httpwe.html).
-
-## Compatibility
-
-### .NET RabbitMQ client 3.4.4
-
-Quite a few issues exist when attempting to integrate AMQP with Unity, specifically with the official .NET RabbitMQ client. Since Unity  (as of version 5.5.1) still only supports .NET Framework 3.5 that means that a specific version of the .NET RabbitMQ client must be used. The last version to support .NET 3.5 is version 3.4.4 of the RabbitMQ client. Any version greather than 3.4.4 is not compatible with Unity.
-
-Building version 3.4.4 has a few issues. It's an archived version at this point so first you must track it down in the official git repository for the client. Also it was built with Visual Studio 2008 and when opening the project in Visual Studio 2015 the upgrade fails with errors. The [build instructions](http://www.rabbitmq.com/build-dotnet-client.html) on RabbitMQ's offical website are no longer accurate to version 3.4.4 and it was difficult to track them down. The [internet archive](https://archive.org/) fortunately yielded a page with build instructions.
-
-The version of the RabbitMQ client library that is in the **/lib** folder of this project has already been upgraded and will open and build properly in Visual Studio 2015.
-
-The **CymaticLabs.Unity3D.Amqp** project references the local 3.4.4 client projects directly. This is useful if you need to debug the RabbitMQ client library itself (including break points). Also there seems to be no official nuget package for 3.4.4, only 3.4.3 and 3.5.0; so this project includes the additional bug fixes of 3.4.4.
-
-### Unity 3D Build Support
-
-This library has been successfully tested for the follow platforms/builds:
-
-* Windows 10 (native, not UWP - UWP will likely not work without modification)
-* macOS El Capitan
-* Android 7.0
-
-This library is likely compatible with other versions of Windows, macOS, and Android, but they just hasn't been tested yet. Linux and iOS might work as well but also have not been tested (if you end up trying and it works, please let me know). Since macOS with Mono works, it is likely that Linux builds will work without any modification.
-
-iOS support is definitely on the roadmap. Hopefully things will work as-is when it comes time to test, but if not there at least some clues that provide hope it should be possible. [This post about Xamarin integration](https://forums.xamarin.com/discussion/49858/using-rabbitmq-amqp-with-xamarin-forms) hints it should work.
 
 ## License
 
