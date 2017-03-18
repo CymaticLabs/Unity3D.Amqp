@@ -21,6 +21,11 @@ namespace CymaticLabs.Unity3D.Amqp.UI
         public bool OpenOnStart = true;
 
         /// <summary>
+        /// Whether or not to give focus to the user input of the console on start.
+        /// </summary>
+        public bool FocusOnStart = true;
+
+        /// <summary>
         /// The key used to toggle the console open/closed.
         /// </summary>
         public KeyCode ToggleKey = KeyCode.F1;
@@ -133,9 +138,7 @@ namespace CymaticLabs.Unity3D.Amqp.UI
 
         void Start()
         {
-            UserInput.Select();
-            UserInput.ActivateInputField();
-            if (OpenOnStart) Open();
+            if (OpenOnStart) Open(FocusOnStart);
         }
 
         #endregion Init
@@ -311,14 +314,19 @@ namespace CymaticLabs.Unity3D.Amqp.UI
         /// <summary>
         /// Opens the console.
         /// </summary>
-        public static void Open()
+        /// <param name="focus">Whether or not to put focus into the user input after opening.</param>
+        public static void Open(bool focus = true)
         {
             if (IsOpen) return; // nothing to do
             Instance.Window.SetActive(true);
-            Instance.UserInput.Select();
-            Instance.UserInput.ActivateInputField();
             Cursor.visible = true;
             IsOpen = true;
+
+            if (focus)
+            {
+                Instance.UserInput.Select();
+                Instance.UserInput.ActivateInputField();
+            }
         }
 
         public void OnOpen()

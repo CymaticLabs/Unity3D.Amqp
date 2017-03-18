@@ -61,7 +61,7 @@ namespace CymaticLabs.Unity3D.Amqp
         /// <summary>
         /// Whether or not the delivery mode is currently set to persistent.
         /// </summary>
-        //bool Persistent { get; set; }
+        bool Persistent { get; set; }
 
         /// <summary>
         /// Message priority, 0 to 9.

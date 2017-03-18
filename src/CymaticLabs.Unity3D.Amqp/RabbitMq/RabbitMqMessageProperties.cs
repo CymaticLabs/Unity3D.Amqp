@@ -15,6 +15,9 @@ namespace CymaticLabs.Unity3D.Amqp.RabbitMq
         // The internal RabbitMQ basic properties reference being wrapped.
         IBasicProperties wrapped;
 
+        // Whether or not the message is persistent
+        bool persistent = false;
+
         #endregion Fields
 
         #region Properties
@@ -163,21 +166,22 @@ namespace CymaticLabs.Unity3D.Amqp.RabbitMq
             }
         }
 
-        ///// <summary>
-        ///// Whether or not the delivery mode is currently set to persistent.
-        ///// </summary>
-        //public bool Persistent
-        //{
-        //    get
-        //    {
-        //        return wrapped.Persistent;
-        //    }
+        /// <summary>
+        /// Whether or not the delivery mode is currently set to persistent.
+        /// </summary>
+        public bool Persistent
+        {
+            get
+            {
+                return persistent;
+            }
 
-        //    set
-        //    {
-        //        wrapped.Persistent = value;
-        //    }
-        //}
+            set
+            {
+                persistent = value;
+                wrapped.SetPersistent(persistent);
+            }
+        }
 
         /// <summary>
         /// Message priority, 0 to 9.

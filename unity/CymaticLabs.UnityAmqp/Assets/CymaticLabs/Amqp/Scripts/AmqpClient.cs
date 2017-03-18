@@ -937,12 +937,13 @@ namespace CymaticLabs.Unity3D.Amqp
         /// <param name="exchangeName">The name of the exchange to publish the message on.</param>
         /// <param name="routingKey">The optional routing key to use.</param>
         /// <param name="message">The message to publish.</param>
+        /// <param name="properties">The optional message properties to use when publishing the message.</param>
         /// <param name="mandatory">Whether or not to publish with the AMQP "mandatory" flag.</param>
         /// <param name="immediate">Whether or not to publish with the AMQP "immediate" flag.</param>
-        public static void Publish(string exchangeName, string routingKey, string message, bool mandatory = false, bool immediate = false)
+        public static void Publish(string exchangeName, string routingKey, string message, IAmqpMessageProperties properties = null, bool mandatory = false, bool immediate = false)
         {
             if (Instance == null) return;
-            Instance.PublishToExchange(exchangeName, routingKey, message, mandatory, immediate);
+            Instance.PublishToExchange(exchangeName, routingKey, message, properties, mandatory, immediate);
         }
 
         /// <summary>
@@ -951,16 +952,17 @@ namespace CymaticLabs.Unity3D.Amqp
         /// <param name="exchangeName">The name of the exchange to publish the message on.</param>
         /// <param name="routingKey">The optional routing key to use.</param>
         /// <param name="message">The message to publish.</param>
+        /// <param name="properties">The optional message properties to use when publishing the message.</param>
         /// <param name="mandatory">Whether or not to publish with the AMQP "mandatory" flag.</param>
         /// <param name="immediate">Whether or not to publish with the AMQP "immediate" flag.</param>
-        public void PublishToExchange(string exchangeName, string routingKey, string message, bool mandatory = false, bool immediate = false)
+        public void PublishToExchange(string exchangeName, string routingKey, string message, IAmqpMessageProperties properties = null, bool mandatory = false, bool immediate = false)
         {
             if (isQuitting) return;
             if (string.IsNullOrEmpty(exchangeName)) throw new System.ArgumentNullException("exchangeName");
             if (routingKey == null) routingKey = "";
             if (string.IsNullOrEmpty(message)) throw new System.ArgumentNullException("message");
             if (client == null) throw new System.InvalidOperationException("Must be connected to message broker first.");
-            client.Publish(exchangeName, routingKey, message, mandatory, immediate);
+            client.Publish(exchangeName, routingKey, properties, message, mandatory, immediate);
         }
 
         /// <summary>
@@ -969,12 +971,13 @@ namespace CymaticLabs.Unity3D.Amqp
         /// <param name="exchangeName">The name of the exchange to publish the message on.</param>
         /// <param name="routingKey">The optional routing key to use.</param>
         /// <param name="message">The message to publish.</param>
+        /// <param name="properties">The optional message properties to use when publishing the message.</param>
         /// <param name="mandatory">Whether or not to publish with the AMQP "mandatory" flag.</param>
         /// <param name="immediate">Whether or not to publish with the AMQP "immediate" flag.</param>
-        public static void Publish(string exchangeName, string routingKey, byte[] message, bool mandatory = false, bool immediate = false)
+        public static void Publish(string exchangeName, string routingKey, byte[] message, IAmqpMessageProperties properties = null, bool mandatory = false, bool immediate = false)
         {
             if (Instance == null) return;
-            Instance.PublishToExchange(exchangeName, routingKey, message, mandatory, immediate);
+            Instance.PublishToExchange(exchangeName, routingKey, message, properties, mandatory, immediate);
         }
 
         /// <summary>
@@ -983,16 +986,17 @@ namespace CymaticLabs.Unity3D.Amqp
         /// <param name="exchangeName">The name of the exchange to publish the message on.</param>
         /// <param name="routingKey">The optional routing key to use.</param>
         /// <param name="message">The message to publish.</param>
+        /// <param name="properties">The optional message properties to use when publishing the message.</param>
         /// <param name="mandatory">Whether or not to publish with the AMQP "mandatory" flag.</param>
         /// <param name="immediate">Whether or not to publish with the AMQP "immediate" flag.</param>
-        public void PublishToExchange(string exchangeName, string routingKey, byte[] message, bool mandatory = false, bool immediate = false)
+        public void PublishToExchange(string exchangeName, string routingKey, byte[] message, IAmqpMessageProperties properties = null, bool mandatory = false, bool immediate = false)
         {
             if (isQuitting) return;
             if (string.IsNullOrEmpty(exchangeName)) throw new System.ArgumentNullException("exchangeName");
             if (routingKey == null) routingKey = "";
             if (message == null || message.Length == 0) throw new System.ArgumentNullException("message");
             if (client == null) throw new System.InvalidOperationException("Must be connected to message broker first.");
-            client.Publish(exchangeName, routingKey, message, mandatory, immediate);
+            client.Publish(exchangeName, routingKey, properties, message, mandatory, immediate);
         }
 
         // TODO Test and support queue publishing scenarios

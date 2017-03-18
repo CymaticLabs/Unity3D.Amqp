@@ -108,7 +108,6 @@ namespace CymaticLabs.Unity3D.Amqp.UI
             AmqpClient.Instance.Connection = connectionName;
 
             AmqpClient.Connect();
-            AmqpConsole.Instance.Focus();
         }
 
         /// <summary>
@@ -118,7 +117,6 @@ namespace CymaticLabs.Unity3D.Amqp.UI
         {
             // Disconnect
             AmqpClient.Disconnect();
-            AmqpConsole.Instance.Focus();
         }
 
         /// <summary>
@@ -164,7 +162,6 @@ namespace CymaticLabs.Unity3D.Amqp.UI
                     AmqpConsole.Color = new Color(1f, 0.5f, 0);
                     AmqpConsole.WriteLineFormat("Subscription already exists for exchange {0}:{1}", exchangeName, routingKey);
                     AmqpConsole.Color = null;
-                    AmqpConsole.Instance.Focus();
                     return;
                 }
             }
@@ -174,8 +171,6 @@ namespace CymaticLabs.Unity3D.Amqp.UI
 
             // Subscribe on the client
             AmqpClient.Subscribe(subscription);
-
-            AmqpConsole.Instance.Focus();
         }
 
         /// <summary>
@@ -222,7 +217,6 @@ namespace CymaticLabs.Unity3D.Amqp.UI
                 {
                     AmqpClient.Unsubscribe(sub);
                     exSubscriptions.Remove(sub);
-                    AmqpConsole.Instance.Focus();
                     return;
                 }
             }
@@ -230,8 +224,6 @@ namespace CymaticLabs.Unity3D.Amqp.UI
             AmqpConsole.Color = new Color(1f, 0.5f, 0);
             AmqpConsole.WriteLineFormat("Subscription not found for exchange {0}:{1}", exchangeName, routingKey);
             AmqpConsole.Color = null;
-
-            AmqpConsole.Instance.Focus();
         }
 
         /// <summary>
@@ -283,7 +275,9 @@ namespace CymaticLabs.Unity3D.Amqp.UI
             AmqpClient.Publish(exchangeName, routingKey, message);
             PublishMessage.text = null; // clear out message
 
-            AmqpConsole.Instance.Focus();
+            // Refocus the message area
+            PublishMessage.Select();
+            PublishMessage.ActivateInputField();
         }
 
         #region Event Handlers
