@@ -283,7 +283,7 @@ namespace CymaticLabs.Unity3D.Amqp.UI
         #region Event Handlers
 
         // Handles a connection event
-        void HandleConnected()
+        void HandleConnected(AmqpClient client)
         {
             Connection.interactable = false;
             ConnectButton.interactable = false;
@@ -318,7 +318,7 @@ namespace CymaticLabs.Unity3D.Amqp.UI
         }
 
         // Handles a disconnection event
-        void HandleDisconnected()
+        void HandleDisconnected(AmqpClient client)
         {
             Connection.interactable = true;
             ConnectButton.interactable = true;
@@ -336,13 +336,13 @@ namespace CymaticLabs.Unity3D.Amqp.UI
         }
 
         // Handles a reconnecting event
-        void HandleReconnecting()
+        void HandleReconnecting(AmqpClient client)
         {
 
         }
 
         // Handles a blocked event
-        void HandleBlocked()
+        void HandleBlocked(AmqpClient client)
         {
 
         }

@@ -160,6 +160,11 @@ namespace CymaticLabs.Unity3D.Amqp
         }
 
         /// <summary>
+        /// The underlying broker connection used by the client.
+        /// </summary>
+        public IAmqpBrokerConnection BrokerConnection {  get { return client; } }
+
+        /// <summary>
         /// Gets the file name for the AMQP connections data.
         /// </summary>
         public static string ConfigurationFilename
@@ -174,22 +179,22 @@ namespace CymaticLabs.Unity3D.Amqp
         /// <summary>
         /// Occurs when the client has connected to the AMQP message broker.
         /// </summary>
-        public UnityEvent OnConnected;
+        public AmqpClientUnityEvent OnConnected;
 
         /// <summary>
         /// Occurs when the client has disconnected from the AMQP message broker.
         /// </summary>
-        public UnityEvent OnDisconnected;
+        public AmqpClientUnityEvent OnDisconnected;
 
         /// <summary>
         /// Occurs when the client has been blocked by the AMQP message broker.
         /// </summary>
-        public UnityEvent OnBlocked;
+        public AmqpClientUnityEvent OnBlocked;
 
         /// <summary>
         /// Occurs when the client has started reconnecting to the AMQP message broker.
         /// </summary>
-        public UnityEvent OnReconnecting;
+        public AmqpClientUnityEvent OnReconnecting;
 
         /// <summary>
         /// Occurs when there is a connection error.
@@ -305,7 +310,7 @@ namespace CymaticLabs.Unity3D.Amqp
             {
                 hasConnected = false; // reset the flag for the next event
                 Log("Connected to AMQP host {0}", AmqpHelper.GetConnectionInfo(client));
-                if (OnConnected != null) OnConnected.Invoke();
+                if (OnConnected != null) OnConnected.Invoke(this);
             }
 
             // The client has disconnected
@@ -313,7 +318,7 @@ namespace CymaticLabs.Unity3D.Amqp
             {
                 hasDisconnected = false; // reset the flag for the next event
                 Log("Disconnected from AMQP host {0}", AmqpHelper.GetConnectionInfo(client));
-                if (OnDisconnected != null) OnDisconnected.Invoke();
+                if (OnDisconnected != null) OnDisconnected.Invoke(this);
             }
 
             // The client has disconnected
@@ -321,7 +326,7 @@ namespace CymaticLabs.Unity3D.Amqp
             {
                 isReconnecting = false; // reset the flag for the next event
                 Log("Reconnecting to AMQP host: {0}", AmqpHelper.GetConnectionInfo(client));
-                if (OnReconnecting != null) OnReconnecting.Invoke();
+                if (OnReconnecting != null) OnReconnecting.Invoke(this);
             }
 
             // The client has been blocked
@@ -329,7 +334,7 @@ namespace CymaticLabs.Unity3D.Amqp
             {
                 wasBlocked = false; // reset the flag for the next event
                 Log("Connection to AMQP host blocked: {0}", AmqpHelper.GetConnectionInfo(client));
-                if (OnBlocked != null) OnBlocked.Invoke();
+                if (OnBlocked != null) OnBlocked.Invoke(this);
             }
 
             // It's safe to subscribe so restore subscriptions
