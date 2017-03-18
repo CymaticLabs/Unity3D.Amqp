@@ -164,9 +164,6 @@ Here's a quick description of the script's inspector properties:
 * **Connect On Start** - When enabled the script will attempt to establish a connection to the AMQP server on Start()
 * **Relaxed Ssl Validation** - When enabled SSL certificate validation from the AMQP server will be relaxed ([see details](#ssl-support))
 * **Write To Console** - When enabled important AMQP log details will be written to the included AmqpConsole class/prefab (optional)
-* **Requested Heart Beat** - The number of seconds of the requested connection keep-alive heart beat.
-* **Exchange Subscriptions** - A list of exchange subscriptions that the client will subscribe to upon successful connection (make sure they are enabled and that you select the correct exchange type)
-* **Queue Subscriptions** - A list of direct queue subscriptions that the client will subscribe to upon successful connection (make sure they are enabled)
 
 Events:
 
