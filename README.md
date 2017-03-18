@@ -20,8 +20,8 @@ This project offers the following:
   - [Background](#background)
   - [AMQP and Unity](#amqp-and-unity)
 - [Compatibility](#compatibility)
+  - [Supported Unity 3D Builds](#supported-unity-3d-builds)
   - [.NET RabbitMQ client 3.4.4](#net-rabbitmq-client-344)
-  - [Unity 3D Build Support](#unity-3d-build-support)  
 - [Installation](#installation)
 - [Quick Start](#quick-start)
 - [Thread Safety](#thread-safety)
@@ -54,17 +54,7 @@ Unity's built-in network multiplayer system does not offer very sophisticated me
 
 ## Compatibility
 
-### .NET RabbitMQ client 3.4.4
-
-Quite a few issues exist when attempting to integrate AMQP with Unity, specifically with the official .NET RabbitMQ client. Since Unity  (as of version 5.5.1) still only supports .NET Framework 3.5 that means that a specific version of the .NET RabbitMQ client must be used. The last version to support .NET 3.5 is version 3.4.4 of the RabbitMQ client. Any version greather than 3.4.4 is not compatible with Unity.
-
-Building version 3.4.4 has a few issues. It's an archived version at this point so first you must track it down in the official git repository for the client. Also it was built with Visual Studio 2008 and when opening the project in Visual Studio 2015 the upgrade fails with errors. The [build instructions](http://www.rabbitmq.com/build-dotnet-client.html) on RabbitMQ's offical website are no longer accurate to version 3.4.4 and it was difficult to track them down. The [internet archive](https://archive.org/) fortunately yielded a page with build instructions.
-
-The version of the RabbitMQ client library that is in the **/lib** folder of this project has already been upgraded and will open and build properly in Visual Studio 2015.
-
-The **CymaticLabs.Unity3D.Amqp** project references the local 3.4.4 client projects directly. This is useful if you need to debug the RabbitMQ client library itself (including break points). Also there seems to be no official nuget package for 3.4.4, only 3.4.3 and 3.5.0; so this project includes the additional bug fixes of 3.4.4.
-
-### Unity 3D Build Support
+### Supported Unity 3D Builds
 
 * Windows
   * tested with Windows 10 Standalone
@@ -79,6 +69,16 @@ The **CymaticLabs.Unity3D.Amqp** project references the local 3.4.4 client proje
   * untested but should work for Standalone builds 
 
 This library is likely compatible with other versions of Windows, macOS, and Android, but they just hasn't been tested yet. Linux should work as well but has not been tested (if you end up trying and it works, please let me know). Since macOS with Mono works, it is likely that Linux builds will work without any modification.
+
+### .NET RabbitMQ client 3.4.4
+
+Quite a few issues exist when attempting to integrate AMQP with Unity, specifically with the official .NET RabbitMQ client. Since Unity  (as of version 5.5.1) still only supports .NET Framework 3.5 that means that a specific version of the .NET RabbitMQ client must be used. The last version to support .NET 3.5 is version 3.4.4 of the RabbitMQ client. Any version greather than 3.4.4 is not compatible with Unity.
+
+Building version 3.4.4 has a few issues. It's an archived version at this point so first you must track it down in the official git repository for the client. Also it was built with Visual Studio 2008 and when opening the project in Visual Studio 2015 the upgrade fails with errors. The [build instructions](http://www.rabbitmq.com/build-dotnet-client.html) on RabbitMQ's offical website are no longer accurate to version 3.4.4 and it was difficult to track them down. The [internet archive](https://archive.org/) fortunately yielded a page with build instructions.
+
+The version of the RabbitMQ client library that is in the **/lib** folder of this project has already been upgraded and will open and build properly in Visual Studio 2015.
+
+The **CymaticLabs.Unity3D.Amqp** project references the local 3.4.4 client projects directly. This is useful if you need to debug the RabbitMQ client library itself (including break points). Also there seems to be no official nuget package for 3.4.4, only 3.4.3 and 3.5.0; so this project includes the additional bug fixes of 3.4.4.
 
 ## Installation
 
