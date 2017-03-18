@@ -8,7 +8,7 @@ Attempts to track down other integrations of AMQP clients into Unity 3D all came
 **Note:** This project is very new so the documentation will probably be a bit sparse until there is more time to build it up. The project will also be constantly adding features and may including breaking changes. The code is fairly well documented however so if you feel like just diving in and trying to make sense of it - go for it! It will still be easier than trying from scratch to get AMQP support in Unity.
 
 This project offers the following:
-* A Unity asset package that can be imported into Unity projects made with Unity 5.x+ that provides easy AMQP client integration (tested with Windows, macOS, and Android builds so far, Linux will likely work too, iOS planned)
+* A Unity asset package that can be imported into Unity projects made with Unity 5.5.2 that provides easy AMQP client integration (tested with Windows, macOS, Android, and iOS builds so far; Linux should work work too)
 * A custom .NET library that wraps the RabbitMQ client and provides extensibility for integrating other AMQP clients beyond RabbitMQ .NET if necessary
 * A thread-safe pattern that plays nice with Unity's game thread (out of the box the .NET RabbitMQ client cannot directly interact with Unity's game thread)
 * Unity C# source files that provide Unity-specific classes and MonoBehaviour scripts for working with AMQP including a useful diagnostics console
@@ -66,15 +66,19 @@ The **CymaticLabs.Unity3D.Amqp** project references the local 3.4.4 client proje
 
 ### Unity 3D Build Support
 
-This library has been successfully tested for the follow platforms/builds:
+* Windows
+  * tested with Windows 10 Standalone
+  * UWP is not supported yet without more work
+* macOS
+  * tested with El Capitan
+* Android
+  * tested with Android 7.0;  Mono2x and IL2CPP scripting backends
+* iOS
+  * tested with iOS 10.2.1; IL2CPP scripting backend
+* Linux
+  * untested but should work for Standalone builds 
 
-* Windows 10 (native, not UWP - UWP will likely not work without modification)
-* macOS El Capitan
-* Android 7.0
-
-This library is likely compatible with other versions of Windows, macOS, and Android, but they just hasn't been tested yet. Linux and iOS might work as well but also have not been tested (if you end up trying and it works, please let me know). Since macOS with Mono works, it is likely that Linux builds will work without any modification.
-
-iOS support is definitely on the roadmap. Hopefully things will work as-is when it comes time to test, but if not there at least some clues that provide hope it should be possible. [This post about Xamarin integration](https://forums.xamarin.com/discussion/49858/using-rabbitmq-amqp-with-xamarin-forms) hints it should work.
+This library is likely compatible with other versions of Windows, macOS, and Android, but they just hasn't been tested yet. Linux should work as well but has not been tested (if you end up trying and it works, please let me know). Since macOS with Mono works, it is likely that Linux builds will work without any modification.
 
 ## Installation
 
