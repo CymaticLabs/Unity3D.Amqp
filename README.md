@@ -56,16 +56,16 @@ Unity's built-in network multiplayer system does not offer very sophisticated me
 
 ### Supported Unity 3D Builds
 
-* Windows
+* **Windows**
   * tested with Windows 10 Standalone
   * UWP is not supported yet without more work
-* macOS
+* **macOS**
   * tested with El Capitan
-* Android
+* **Android**
   * tested with Android 7.0;  Mono2x and IL2CPP scripting backends
-* iOS
+* **iOS**
   * tested with iOS 10.2.1; IL2CPP scripting backend
-* Linux
+* **Linux**
   * untested but should work for Standalone builds 
 
 This library is likely compatible with other versions of Windows, macOS, and Android, but they just hasn't been tested yet. Linux should work as well but has not been tested (if you end up trying and it works, please let me know). Since macOS with Mono works, it is likely that Linux builds will work without any modification.
