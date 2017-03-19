@@ -184,6 +184,38 @@ namespace CymaticLabs.Unity3D.Amqp
         }
 
         /// <summary>
+        /// Gets or sets the maximum number of times the client will attempt to reconnect to the host before aborting.
+        /// </summary>
+        public uint ReconnectRetryLimit
+        {
+            get { return client != null ? client.ReconnectRetryLimit : uint.MaxValue; }
+
+            set
+            {
+                client.ReconnectRetryLimit = value;
+            }
+        }
+
+        /// <summary>
+        /// Gets or sets the maximum number of failed subscriptions the client will tolerate before preventing connection to the host.
+        /// </summary>
+        /// <remarks>
+        /// Presently in RabbitMQ if there is an error during subscription the host will close the connection
+        /// so the client must reconnect. In cases where the client attempts to resubscribe the same failing subscription
+        /// this can lead to an endless loop of connect->subscribe->error->reconnect->infinity. Putting a limit
+        /// prevents the loop from going on infinitely.
+        /// </remarks>
+        public byte SubscribeRetryLimit
+        {
+            get { return client != null ? client.SubscribeRetryLimit : (byte)10; }
+
+            set
+            {
+                client.SubscribeRetryLimit = value;
+            }
+        }
+
+        /// <summary>
         /// The underlying broker connection used by the client.
         /// </summary>
         public IAmqpBrokerConnection BrokerConnection {  get { return client; } }
@@ -859,6 +891,27 @@ namespace CymaticLabs.Unity3D.Amqp
             // Connect the client
             Log("Disconnecting from AMQP host: {0}", AmqpHelper.GetConnectionInfo(client));
             client.Disconnect();
+        }
+
+        /// <summary>
+        /// Resets the connection when it has ended up in an aborted state.
+        /// </summary>
+        public static void DiscoResetConnection()
+        {
+            if (Instance == null) return;
+            Instance.ResetConnectionToHost();
+        }
+
+        /// <summary>
+        /// Resets the connection when it has ended up in an aborted state.
+        /// </summary>
+        public void ResetConnectionToHost()
+        {
+            if (client == null) return;
+
+            // Connect the client
+            Log("Reseting connection for AMQP host: {0}", AmqpHelper.GetConnectionInfo(client));
+            client.ResetConnection();
         }
 
         #endregion Connection

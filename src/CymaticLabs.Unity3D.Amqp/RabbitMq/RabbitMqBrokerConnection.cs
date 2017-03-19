@@ -269,7 +269,7 @@ namespace CymaticLabs.Unity3D.Amqp.RabbitMq
             exchangeSubscriptions = new List<AmqpExchangeSubscription>();
             queueSubscriptions = new List<AmqpQueueSubscription>();
 
-            ReconnectRetryLimit = int.MaxValue;
+            ReconnectRetryLimit = uint.MaxValue;
             SubscribeRetryLimit = 10;
         }
 
