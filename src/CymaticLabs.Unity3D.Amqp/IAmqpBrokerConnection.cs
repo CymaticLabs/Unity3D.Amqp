@@ -51,6 +51,22 @@ namespace CymaticLabs.Unity3D.Amqp
         ushort RequestedHeartbeat { get; }
 
         /// <summary>
+        /// Gets or sets the maximum number of times the client will attempt to reconnect to the host before aborting.
+        /// </summary>
+        uint ReconnectRetryLimit { get; set; }
+
+        /// <summary>
+        /// Gets or sets the maximum number of failed subscriptions the client will tolerate before preventing connection to the host.
+        /// </summary>
+        /// <remarks>
+        /// Presently in RabbitMQ if there is an error during subscription the host will close the connection
+        /// so the client must reconnect. In cases where the client attempts to resubscribe the same failing subscription
+        /// this can lead to an endless loop of connect->subscribe->error->reconnect->infinity. Putting a limit
+        /// prevents the loop from going on infinitely.
+        /// </remarks>
+        byte SubscribeRetryLimit { get; set; }
+
+        /// <summary>
         /// The connection state.
         /// </summary>
         AmqpConnectionStates State { get; }
@@ -85,6 +101,14 @@ namespace CymaticLabs.Unity3D.Amqp
         event EventHandler Reconnecting;
 
         /// <summary>
+        /// Occurs when the client aborts attempting to automatically reconnect because it reached
+        /// one of its retry attempt limits. When a connection is aborted <see cref="ResetConnection"/>
+        /// must be called before attemtping any further connections. This feature is implemented to 
+        /// prevent infinite connect->error->disconnect->reconnect->infinity scenarios.
+        /// </summary>
+        event EventHandler ConnectionAborted;
+
+        /// <summary>
         /// Occurs when there is a connection error.
         /// </summary>
         event EventHandler<ExceptionEventArgs> ConnectionError;
@@ -109,6 +133,26 @@ namespace CymaticLabs.Unity3D.Amqp
         /// </summary>
         event AmqpQueueSubscriptionEventHandler UnsubscribedFromQueue;
 
+        /// <summary>
+        /// Occurs when there is an error subscribing to an exchange.
+        /// </summary>
+        event EventHandler<ExceptionEventArgs> ExchangeSubscribeError;
+
+        /// <summary>
+        /// Occurs when there is an error subscribing to a queue.
+        /// </summary>
+        event EventHandler<ExceptionEventArgs> QueueSubscribeError;
+
+        /// <summary>
+        /// Occurs when there is an error unsubscribing from an exchange.
+        /// </summary>
+        event EventHandler<ExceptionEventArgs> ExchangeUnsubscribeError;
+
+        /// <summary>
+        /// Occurs when there is an error unsubscribing from a queue.
+        /// </summary>
+        event EventHandler<ExceptionEventArgs> QueueUnsubscribeError;
+
         #endregion Events
 
         #region Methods
@@ -125,6 +169,11 @@ namespace CymaticLabs.Unity3D.Amqp
         /// </summary>
         void Disconnect();
 
+        /// <summary>
+        /// Resets the connection and clears things like reconnect counters.
+        /// </summary>
+        void ResetConnection();
+
         #endregion Connections
 
         #region Subscriptions
@@ -132,26 +181,29 @@ namespace CymaticLabs.Unity3D.Amqp
         /// <summary>
         /// Adds an exchange subscription to the connection.
         /// </summary>
-        /// <param name="subscription">The subscription to add.</param>        
-        void Subscribe(AmqpExchangeSubscription subscription);
+        /// <param name="subscription">The subscription to add.</param>
+        /// <returns>The exception (if any) that occurred during the operation.</returns>
+        Exception Subscribe(AmqpExchangeSubscription subscription);
 
         /// <summary>
         /// Removes an existing exchange subscription from the connection.
         /// </summary>
         /// <param name="subscription">The subscription to remove.</param>
-        void Unsubscribe(AmqpExchangeSubscription subscription);
+        /// <returns>The exception (if any) that occurred during the operation.</returns>
+        Exception Unsubscribe(AmqpExchangeSubscription subscription);
 
         /// <summary>
         /// Adds a queue subscription to the connection.
         /// </summary>
-        /// <param name="subscription">The subscription to add.</param>        
-        void Subscribe(AmqpQueueSubscription subscription);
+        /// <param name="subscription">The subscription to add.</param>
+        /// <returns>The exception (if any) that occurred during the operation.</returns>
+        Exception Subscribe(AmqpQueueSubscription subscription);
 
         /// <summary>
         /// Removes an existing queue subscription from the connection.
         /// </summary>
         /// <param name="subscription">The subscription to remove.</param>
-        void Unsubscribe(AmqpQueueSubscription subscription);
+        Exception Unsubscribe(AmqpQueueSubscription subscription);
 
         #endregion Subscriptions
 
@@ -237,6 +289,16 @@ namespace CymaticLabs.Unity3D.Amqp
         /// <returns>A list of AMQP exchanges for the current connection.</returns>
         AmqpExchange[] GetExchanges(string virtualHost = null);
 
+        /// <summary>
+        /// Gets a list of exchanges for the current connection using an asynchronous request.
+        /// </summary>
+        /// <remarks>
+        /// This method is better suited for Unity 3D since it will not block the game thread while the request is made.
+        /// </remarks>
+        /// <param name="callback">The callback that will receive the results.</param>
+        /// <param name="virtualHost">The optional virtual host to get exchanges for. If NULL the connection's default virtual host is used.</param>
+        void GetExchangesAsync(ExchangeListEventHandler callback, string virtualHost = null);
+
         #endregion Exchanges
 
         #region Queues
@@ -275,6 +337,16 @@ namespace CymaticLabs.Unity3D.Amqp
         /// <param name="virtualHost">The optional virtual host to get queues for. If NULL the connection's default virtual host is used.</param>
         /// <returns>A list of AMQP queues for the current connection.</returns>
         AmqpQueue[] GetQueues(string virtualHost = null);
+
+        /// <summary>
+        /// Gets a list of queues for the current connection using an asynchronous request.
+        /// </summary>
+        /// <remarks>
+        /// This method is better suited for Unity 3D since it will not block the game thread while the request is made.
+        /// </remarks>
+        /// <param name="callback">The callback that will receive the results.</param>
+        /// <param name="virtualHost">The optional virtual host to get queues for. If NULL the connection's default virtual host is used.</param>
+        void GetQueuesAsync(QueueListEventHandler callback, string virtualHost = null);
 
         #endregion Queues
 

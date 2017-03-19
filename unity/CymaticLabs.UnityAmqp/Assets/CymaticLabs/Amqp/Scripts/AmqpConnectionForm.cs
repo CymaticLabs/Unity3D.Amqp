@@ -1,5 +1,4 @@
-﻿using System.Collections;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -91,9 +90,7 @@ namespace CymaticLabs.Unity3D.Amqp.UI
 
         #endregion Init
 
-        #region Update
-
-        #endregion Update
+        #region Connect
 
         /// <summary>
         /// Connects to the AMQP broker using the form's client connection values.
@@ -110,6 +107,10 @@ namespace CymaticLabs.Unity3D.Amqp.UI
             AmqpClient.Connect();
         }
 
+        #endregion Connect
+
+        #region Disconnect
+
         /// <summary>
         /// Disconnects the AMQP client.
         /// </summary>
@@ -118,6 +119,10 @@ namespace CymaticLabs.Unity3D.Amqp.UI
             // Disconnect
             AmqpClient.Disconnect();
         }
+
+        #endregion Disconnect
+
+        #region Subscribe
 
         /// <summary>
         /// Subscribes to the AMQP exchange subscription using the form's values.
@@ -173,6 +178,10 @@ namespace CymaticLabs.Unity3D.Amqp.UI
             AmqpClient.Subscribe(subscription);
         }
 
+        #endregion Subscribe
+
+        #region Unsubscribe
+
         /// <summary>
         /// Unsubscribes from the AMQP exchange subscription using the form's values.
         /// </summary>
@@ -225,6 +234,10 @@ namespace CymaticLabs.Unity3D.Amqp.UI
             AmqpConsole.WriteLineFormat("Subscription not found for exchange {0}:{1}", exchangeName, routingKey);
             AmqpConsole.Color = null;
         }
+
+        #endregion Unsubscribe
+
+        #region Publish
 
         /// <summary>
         /// Publishes a message to the current exchange using the form's input values.
@@ -280,6 +293,8 @@ namespace CymaticLabs.Unity3D.Amqp.UI
             PublishMessage.ActivateInputField();
         }
 
+        #endregion Publish
+
         #region Event Handlers
 
         // Handles a connection event
@@ -289,18 +304,15 @@ namespace CymaticLabs.Unity3D.Amqp.UI
             ConnectButton.interactable = false;
             DisconnectButton.interactable = true;
 
-            ExchangeName.interactable = true;
-            RoutingKey.interactable = true;
-            SubscribeButton.interactable = true;
-            UnsubscribeButton.interactable = true;
-
-            PublishButton.interactable = true;
-            PublishExchange.interactable = true;
-            PublishMessage.interactable = true;
-            PublishRoutingKey.interactable = true;
-
             // Query exchange list
-            exchanges = AmqpClient.GetExchanges();
+            AmqpClient.GetExchangesAsync(FinishConnected);
+        }
+
+        // Finishes the connection event by receiving the async result of the exchange query and display the results in the drop down
+        void FinishConnected(AmqpExchange[] exchangeList)
+        {
+            // Copy list locally
+            exchanges = exchangeList;
 
             foreach (var exchange in exchanges)
             {
@@ -315,6 +327,17 @@ namespace CymaticLabs.Unity3D.Amqp.UI
                 ExchangeName.RefreshShownValue();
                 PublishExchange.RefreshShownValue();
             }
+
+            // Enable UI
+            ExchangeName.interactable = true;
+            RoutingKey.interactable = true;
+            SubscribeButton.interactable = true;
+            UnsubscribeButton.interactable = true;
+
+            PublishButton.interactable = true;
+            PublishExchange.interactable = true;
+            PublishMessage.interactable = true;
+            PublishRoutingKey.interactable = true;
         }
 
         // Handles a disconnection event

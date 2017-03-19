@@ -29,6 +29,16 @@ namespace CymaticLabs.Unity3D.Amqp.RabbitMq
         // List of current queue subscriptions
         List<AmqpQueueSubscription> queueSubscriptions;
 
+        // Whether or not the client will attempt to reconnect upon disconnection
+        bool reconnect = false;
+
+        // The number of reconnection retries
+        int connectionRetryCount;
+
+        // An internal list of the number of reconnect retries when errors occur during subscriptions (which cause the whole client to disconnect)
+        // This is implemented to avoid an infinite connect->subscribe->error->drop/disconnect->reconnect->infinity loop
+        int subscribeRetryCount = 0;
+
         #endregion Fields
 
         #region Properties
@@ -77,6 +87,22 @@ namespace CymaticLabs.Unity3D.Amqp.RabbitMq
         /// Gets the requested server/client heartbeat in seconds.
         /// </summary>
         public ushort RequestedHeartbeat { get; private set; }
+
+        /// <summary>
+        /// Gets or sets the maximum number of times the client will attempt to reconnect to the host before aborting.
+        /// </summary>
+        public uint ReconnectRetryLimit { get; set; }
+
+        /// <summary>
+        /// Gets or sets the maximum number of failed subscriptions the client will tolerate before preventing connection to the host.
+        /// </summary>
+        /// <remarks>
+        /// Presently in RabbitMQ if there is an error during subscription the host will close the connection
+        /// so the client must reconnect. In cases where the client attempts to resubscribe the same failing subscription
+        /// this can lead to an endless loop of connect->subscribe->error->reconnect->infinity. Putting a limit
+        /// prevents the loop from going on infinitely.
+        /// </remarks>
+        public byte SubscribeRetryLimit { get; set; }
 
         /// <summary>
         /// The client's connection.
@@ -144,6 +170,14 @@ namespace CymaticLabs.Unity3D.Amqp.RabbitMq
         public event EventHandler Reconnecting;
 
         /// <summary>
+        /// Occurs when the client aborts attempting to automatically reconnect because it reached
+        /// one of its retry attempt limits. When a connection is aborted <see cref="ResetConnection"/>
+        /// must be called before attemtping any further connections. This feature is implemented to 
+        /// prevent infinite connect->error->disconnect->reconnect->infinity scenarios.
+        /// </summary>
+        public event EventHandler ConnectionAborted;
+
+        /// <summary>
         /// Occurs when there is a connection error.
         /// </summary>
         public event EventHandler<ExceptionEventArgs> ConnectionError;
@@ -167,6 +201,26 @@ namespace CymaticLabs.Unity3D.Amqp.RabbitMq
         /// Occurs when an exchange has been unsubscribed from.
         /// </summary>
         public event AmqpQueueSubscriptionEventHandler UnsubscribedFromQueue;
+
+        /// <summary>
+        /// Occurs when there is an error subscribing to an exchange.
+        /// </summary>
+        public event EventHandler<ExceptionEventArgs> ExchangeSubscribeError;
+
+        /// <summary>
+        /// Occurs when there is an error subscribing to a queue.
+        /// </summary>
+        public event EventHandler<ExceptionEventArgs> QueueSubscribeError;
+
+        /// <summary>
+        /// Occurs when there is an error unsubscribing from an exchange.
+        /// </summary>
+        public event EventHandler<ExceptionEventArgs> ExchangeUnsubscribeError;
+
+        /// <summary>
+        /// Occurs when there is an error unsubscribing from a queue.
+        /// </summary>
+        public event EventHandler<ExceptionEventArgs> QueueUnsubscribeError;
 
         #endregion Events
 
@@ -214,6 +268,9 @@ namespace CymaticLabs.Unity3D.Amqp.RabbitMq
             RequestedHeartbeat = requestedHeartbeat;
             exchangeSubscriptions = new List<AmqpExchangeSubscription>();
             queueSubscriptions = new List<AmqpQueueSubscription>();
+
+            ReconnectRetryLimit = int.MaxValue;
+            SubscribeRetryLimit = 10;
         }
 
         #endregion Constructors
@@ -228,7 +285,7 @@ namespace CymaticLabs.Unity3D.Amqp.RabbitMq
             // Ensure that the cliient is connected
             if (State == AmqpConnectionStates.Connected && (Connection == null || !Connection.IsOpen))
             {
-                State = AmqpConnectionStates.Disconnected;
+                lock(stateLock) State = AmqpConnectionStates.Disconnected;
                 Disconnected?.Invoke(this, EventArgs.Empty);
             }
         }
@@ -238,21 +295,30 @@ namespace CymaticLabs.Unity3D.Amqp.RabbitMq
         /// </summary>
         public void Connect()
         {
+            // Ensure 
+            if (connectionRetryCount >= ReconnectRetryLimit || State == AmqpConnectionStates.Aborted)
+            {
+                Console.WriteLine("Connection is currently in an aborted state and must be reset before further connection attempts.");
+                if (Connection != null && Connection.IsOpen) Connection.Close();
+                State = AmqpConnectionStates.Aborted;
+                ConnectionAborted?.Invoke(this, EventArgs.Empty);
+                return;
+            }
+
             if (IsConnected) return;
-            State = AmqpConnectionStates.Connecting;
+            lock(stateLock) State = AmqpConnectionStates.Connecting;
 
             //StreamRuntime.Current.LogInfo("Connecting to {0}...", this);
             Console.WriteLine("Connecting to {0}...", this);
 
             // Begin the connection process
-            int retryCount = 0;
             ThreadPool.QueueUserWorkItem(state =>
             {
                 // Initialize the connection object
                 IConnection connection = null;
 
                 // Use a threaded while loop approach to keep reattempting connection
-                while (State == AmqpConnectionStates.Connecting && (connection == null || !connection.IsOpen))
+                while (State == AmqpConnectionStates.Connecting && connectionRetryCount < ReconnectRetryLimit && (connection == null || !connection.IsOpen))
                 {
                     try
                     {
@@ -298,12 +364,14 @@ namespace CymaticLabs.Unity3D.Amqp.RabbitMq
                         connection.ConnectionUnblocked += Connection_ConnectionUnblocked;
 
                         // Reset retries
-                        retryCount = 0;
+                        lock(stateLock) connectionRetryCount = 0;
+                        reconnect = false;
 
                         bc.State = AmqpConnectionStates.Connected;
                         //StreamRuntime.Current.LogInfo("Connected to {0}", this);
                         Console.WriteLine("Connected to {0}", this);
                         Connected?.Invoke(this, EventArgs.Empty);
+                        return;
                     }
                     catch (Exception ex)
                     {
@@ -321,22 +389,31 @@ namespace CymaticLabs.Unity3D.Amqp.RabbitMq
                             bc.State = AmqpConnectionStates.Disconnected;
                             Disconnected?.Invoke(this, EventArgs.Empty);
                             ConnectionError?.Invoke(this, new ExceptionEventArgs(ex));
+                            return;
                         }
                         else
                         {
-                            // Report retries, but double the count at which we report to avoid flooding logs with many retry attempts
-                            if (++retryCount == 1 || retryCount % 2 == 0)
-                            {
-                                //StreamRuntime.Current.LogError("(retries:{0}) Error connecting to {1} => {2}",
-                                //    retryCount, this, ex.Message);
-                                Console.WriteLine("(retries:{0}) Error connecting to {1} => {2}", retryCount, this, ex.Message);
-                                Reconnecting?.Invoke(this, EventArgs.Empty);
-                            }
-
+                            // Update retry attempt  
+                            lock(stateLock) connectionRetryCount++;
+                            Console.WriteLine("(retries:{0}) Error connecting to {1} => {2}", connectionRetryCount, this, ex.Message);
                             ConnectionError?.Invoke(this, new ExceptionEventArgs(ex));
 
-                            // Sleep a bit before retrying to connect
-                            Thread.Sleep(ReconnectInterval * 1000);
+                            // If the connection retry limit was reached...
+                            if (connectionRetryCount >= ReconnectRetryLimit)
+                            {
+                                // Notify
+                                Disconnect();
+                                State = AmqpConnectionStates.Aborted;
+                                ConnectionAborted?.Invoke(this, EventArgs.Empty);
+                                Console.WriteLine("AMQP Reconnection limit reached; connection aborted.");
+                                return;
+                            }
+                            // Otherwise sleep a bit before retrying to connect
+                            else
+                            {
+                                Reconnecting?.Invoke(this, EventArgs.Empty);
+                                Thread.Sleep(ReconnectInterval * 1000);
+                            }
                         }
                     }
                 }
@@ -348,17 +425,49 @@ namespace CymaticLabs.Unity3D.Amqp.RabbitMq
         /// </summary>
         public void Disconnect()
         {
-            lock(this)
-            {
-                if (!IsConnected) return;
+            if (!IsConnected) return;
 
+            lock (stateLock)
+            {
                 State = AmqpConnectionStates.Disconnecting;
-                Console.WriteLine("Disconnecting from {0}...", this);
-                exchangeSubscriptions.Clear();
-                Connection.Close();
+            }
+
+            Console.WriteLine("Disconnecting from {0}...", this);
+
+            exchangeSubscriptions.Clear();
+            Connection.Close();
+
+            lock(stateLock)
+            { 
                 State = AmqpConnectionStates.Disconnected;
-                Console.WriteLine("Disconnected from {0}", this);
-                Disconnected?.Invoke(this, EventArgs.Empty);
+            }
+
+            Console.WriteLine("Disconnected from {0}", this);
+            Disconnected?.Invoke(this, EventArgs.Empty);
+
+            // If a reconnection is pending, carry it out
+            if (reconnect)
+            {
+                reconnect = false;
+                Thread.Sleep(1000); // wait a minimum amount of time before attempting to reconnect
+                Connect();
+            }
+        }
+
+        /// <summary>
+        /// Resets the connection and clears things like reconnect counters to allow 
+        /// reconnection attempts after the retry limits have been reached which normally prevent any further reconnection.
+        /// </summary>
+        public void ResetConnection()
+        {
+            lock(stateLock)
+            {
+                // Reset state
+                State = AmqpConnectionStates.Disconnected;
+
+                // Reset retry counters
+                connectionRetryCount = 0;
+                subscribeRetryCount = 0;
             }
         }
 
@@ -367,6 +476,7 @@ namespace CymaticLabs.Unity3D.Amqp.RabbitMq
         // Handles the shutdown of a connection
         private void Connection_ConnectionShutdown(object sender, ShutdownEventArgs e)
         {
+            Console.WriteLine("AMQP connection closed by host");
             State = AmqpConnectionStates.Disconnected;
             if (Disconnected != null) Disconnected(this, EventArgs.Empty);
         }
@@ -396,15 +506,26 @@ namespace CymaticLabs.Unity3D.Amqp.RabbitMq
         /// <summary>
         /// Adds an exchange subscription to the connection.
         /// </summary>
-        /// <param name="subscription">The subscription to add.</param>        
-        public void Subscribe(AmqpExchangeSubscription subscription)
+        /// <param name="subscription">The subscription to add.</param>
+        /// <returns>The exception (if any) that occurred during the operation.</returns>
+        public Exception Subscribe(AmqpExchangeSubscription subscription)
         {
             if (subscription == null) throw new ArgumentNullException("subscription");
             if (exchangeSubscriptions.Contains(subscription)) throw new Exception("Subscription already exists.");
-            if (!IsConnected) throw new InvalidOperationException("Must be connected before subscribing.");
+            if (!IsConnected) return new InvalidOperationException("Must be connected before subscribing.");
+
+            // Subscription retry limit reached?
+            if (subscribeRetryCount >= SubscribeRetryLimit || State == AmqpConnectionStates.Aborted)
+            {
+                if (Connection != null && Connection.IsOpen) Connection.Close();
+                Console.WriteLine("Connection is currently in an aborted state and cannot process any more subscriptions");
+                State = AmqpConnectionStates.Aborted;
+                ConnectionAborted?.Invoke(this, EventArgs.Empty);
+                return new Exception("Connection aborted");
+            }
 
             // The connection for the subscription is currently blocked so we can't update anything
-            if (State == AmqpConnectionStates.Blocked) return;
+            if (State == AmqpConnectionStates.Blocked) return new Exception("AMQP broker connection is blocked");
 
             // Ensure a subscription handler has been assigned/is available
             if (subscription.Handler == null) throw new ArgumentNullException("subscription.Handler cannot be null");
@@ -412,79 +533,96 @@ namespace CymaticLabs.Unity3D.Amqp.RabbitMq
             // Ensure an exchange name has been defined
             if (string.IsNullOrEmpty(subscription.ExchangeName)) throw new ArgumentNullException("subscription.ExchangeName cannot be null");
 
-            lock (Channel)
+            //lock (Channel)
+            //{
+            // Ensure the exchange and queue
+            var exchangeName = subscription.ExchangeName;
+
+            // First declare the exchange
+            var exchangeType = subscription.ExchangeType.ToString().ToLower();
+
+            // Attempt to verify the exchange type, passing the wrong exchange breaks the client connection
+            var typeStr = exchangeType;
+
+            try
             {
-                // Ensure the exchange and queue
-                var exchangeName = subscription.ExchangeName;
-
-                // First declare the exchange
-                var exchangeType = subscription.ExchangeType.ToString().ToLower();
-
-                // Attempt to verify the exchange type, passing the wrong exchange breaks the client connection
-                var typeStr = exchangeType;
-
-                try
-                {
-                    Channel.ExchangeDeclare(exchangeName, typeStr, true, false, null);
-                }
-                catch (Exception e1)
+                Channel.ExchangeDeclare(exchangeName, typeStr, true, false, null);
+            }
+            catch (Exception ex)
+            {
+                // If the subscribe retry/reconnect limit hasn't been reach, attempt to restore the connection that was lost
+                if (subscribeRetryCount++ < SubscribeRetryLimit)
                 {
                     // If there was a problem declaring the exchange, for now close the broker connection and reset the connection state
-                    Console.WriteLine("Resetting connection for broker '{0}' - broker error occured:\n\n{1}", this, e1.Message);
+                    Console.WriteLine("(retries:{0}) Resetting connection for broker '{1}' - broker error occured:\n{2}\n", subscribeRetryCount, this, ex.Message);
+                    reconnect = true;
                     Disconnect();
-                    Connect();
-
-                    // The whole broker connection was just reset, so let it restore the state and abort current actions
-                    return;
+                }
+                else
+                {
+                    // Abort further reconnection attempts until connection reset
+                    State = AmqpConnectionStates.Aborted;
+                    ConnectionAborted?.Invoke(this, EventArgs.Empty);
+                    Console.WriteLine("Subscription retry limit reached.");
                 }
 
-                // Next create a queue and bind it to the exchange
-                var queueName = Channel.QueueDeclare().QueueName;
-                var routingKey = subscription.ExchangeType != AmqpExchangeTypes.Fanout ? subscription.RoutingKey : "";
-                Channel.QueueBind(queueName, exchangeName, routingKey);
+                // Notify
+                ExchangeSubscribeError?.Invoke(this, new ExceptionEventArgs(ex));
 
-                // Create an event-based message consumer
-                var consumer = new EventingBasicConsumer(Channel);
-
-                // Connect handler
-                consumer.Received += (o, e) =>
-                {
-                    if (subscription.Handler == null && subscription.ThreadsafeHandler == null)
-                    {
-                        Console.WriteLine("Error: missing subscription handler: {0}", subscription);
-                    }
-                    else if (subscription.Enabled)
-                    {
-                        var handler = subscription.ThreadsafeHandler != null ? subscription.ThreadsafeHandler : subscription.Handler;
-                        handler(new AmqpExchangeReceivedMessage(subscription, new RabbitMqReceivedMessage(e)));
-                    }
-                };
-
-                // Subscribe/consume and store the consumer tag so we can cancel the consumer later if the subscription changes
-                subscription.ConsumerTag = Channel.BasicConsume(queueName, true, consumer);
-                subscription.Consumer = consumer;
-
-                // Store the connection
-                subscription.Connection = this;
-
-                Console.WriteLine("Subscribed to {0}{1} on {2}", subscription.ExchangeName, subscription.RoutingKey, subscription.Connection);
+                // The whole broker connection was just reset, so let it restore the state and abort current actions
+                return ex;
             }
+
+            // Next create a queue and bind it to the exchange
+            var queueName = Channel.QueueDeclare().QueueName;
+            var routingKey = subscription.ExchangeType != AmqpExchangeTypes.Fanout ? subscription.RoutingKey : "";
+            Channel.QueueBind(queueName, exchangeName, routingKey);
+
+            // Create an event-based message consumer
+            var consumer = new EventingBasicConsumer(Channel);
+
+            // Connect handler
+            consumer.Received += (o, e) =>
+            {
+                if (subscription.Handler == null && subscription.ThreadsafeHandler == null)
+                {
+                    Console.WriteLine("Error: missing subscription handler: {0}", subscription);
+                }
+                else if (subscription.Enabled)
+                {
+                    var handler = subscription.ThreadsafeHandler != null ? subscription.ThreadsafeHandler : subscription.Handler;
+                    handler(new AmqpExchangeReceivedMessage(subscription, new RabbitMqReceivedMessage(e)));
+                }
+            };
+
+            // Subscribe/consume and store the consumer tag so we can cancel the consumer later if the subscription changes
+            subscription.ConsumerTag = Channel.BasicConsume(queueName, true, consumer);
+            subscription.Consumer = consumer;
+
+            // Store the connection
+            subscription.Connection = this;
+
+            Console.WriteLine("Subscribed to {0}{1} on {2}", subscription.ExchangeName, subscription.RoutingKey, subscription.Connection);
+            //}
             
             exchangeSubscriptions.Add(subscription);
 
             // Notify
             SubscribedToExchange?.Invoke(subscription);
+
+            return null;
         }
 
         /// <summary>
         /// Removes an existing exchange subscription from the connection.
         /// </summary>
         /// <param name="subscription">The subscription to add.</param>
-        public void Unsubscribe(AmqpExchangeSubscription subscription)
+        /// <returns>The exception (if any) that occurred during the operation.</returns>
+        public Exception Unsubscribe(AmqpExchangeSubscription subscription)
         {
             if (subscription == null) throw new ArgumentNullException("subscription");
             if (!exchangeSubscriptions.Contains(subscription)) throw new Exception("Subscription does not exist.");
-            if (!IsConnected) throw new InvalidOperationException("Must be connected before unsubscribing.");
+            if (!IsConnected) return new InvalidOperationException("Must be connected before unsubscribing.");
 
             // Cancel the consumer
             try
@@ -499,13 +637,19 @@ namespace CymaticLabs.Unity3D.Amqp.RabbitMq
             }
             catch (Exception ex)
             {
-                Console.WriteLine("Error ubsubscribing: {0}", ex);
+                // Notify
+                ExchangeUnsubscribeError?.Invoke(this, new ExceptionEventArgs(ex));
+                var logRoutingKey = !string.IsNullOrEmpty(subscription.RoutingKey) ? " => " + subscription.RoutingKey : "";
+                Console.WriteLine("Error ubsubscribing from {0}{1} {2}", subscription.ExchangeName, logRoutingKey, ex);
+                return ex;
             }
 
             exchangeSubscriptions.Remove(subscription);
 
             // Notify
             UnsubscribedFromExchange?.Invoke(subscription);
+
+            return null;
         }
 
         #endregion Exchange
@@ -515,15 +659,26 @@ namespace CymaticLabs.Unity3D.Amqp.RabbitMq
         /// <summary>
         /// Adds a queue subscription to the connection.
         /// </summary>
-        /// <param name="subscription">The subscription to add.</param>        
-        public void Subscribe(AmqpQueueSubscription subscription)
+        /// <param name="subscription">The subscription to add.</param>
+        /// <returns>The exception (if any) that occurred during the operation.</returns>
+        public Exception Subscribe(AmqpQueueSubscription subscription)
         {
             if (subscription == null) throw new ArgumentNullException("subscription");
             if (queueSubscriptions.Contains(subscription)) throw new Exception("Subscription already exists.");
-            if (!IsConnected) throw new InvalidOperationException("Must be connected before subscribing.");
+            if (!IsConnected) return new InvalidOperationException("Must be connected before subscribing.");
+
+            // Subscription retry limit reached?
+            if (subscribeRetryCount >= SubscribeRetryLimit || State == AmqpConnectionStates.Aborted)
+            {
+                if (Connection != null && Connection.IsOpen) Connection.Close();
+                State = AmqpConnectionStates.Aborted;
+                ConnectionAborted?.Invoke(this, EventArgs.Empty);
+                Console.WriteLine("Connection is currently in an aborted state and cannot process any more subscriptions");
+                return new Exception("Connection aborted");
+            }
 
             // The connection for the subscription is currently blocked so we can't update anything
-            if (State == AmqpConnectionStates.Blocked) return;
+            if (State == AmqpConnectionStates.Blocked) return new Exception("AMQP connection blocked by host");
 
             // Ensure a subscription handler has been assigned/is available
             if (subscription.Handler == null) throw new ArgumentNullException("subscription.Handler cannot be null");
@@ -533,34 +688,54 @@ namespace CymaticLabs.Unity3D.Amqp.RabbitMq
 
             try
             {
-                lock(Channel)
+                //lock(Channel)
+                //{
+                // Create a queue/message consumer
+                var consumer = new EventingBasicConsumer(Channel);
+                subscription.Consumer = consumer;
+
+                // Apply the handler
+                consumer.Received += (o, e) =>
                 {
-                    // Create a queue/message consumer
-                    var consumer = new EventingBasicConsumer(Channel);
-                    subscription.Consumer = consumer;
-
-                    // Apply the handler
-                    consumer.Received += (o, e) =>
+                    if (subscription.Handler == null && subscription.ThreadsafeHandler == null)
                     {
-                        if (subscription.Handler == null && subscription.ThreadsafeHandler == null)
-                        {
-                            Console.WriteLine("Error: missing subscription handler: {0}", subscription);
-                        }
-                        else if (subscription.Enabled)
-                        {
-                            var handler = subscription.ThreadsafeHandler != null ? subscription.ThreadsafeHandler : subscription.Handler;
-                            handler(new AmqpQueueReceivedMessage(subscription, new RabbitMqReceivedMessage(e)));
-                        }
-                    };
+                        Console.WriteLine("Error: missing subscription handler: {0}", subscription);
+                    }
+                    else if (subscription.Enabled)
+                    {
+                        var handler = subscription.ThreadsafeHandler != null ? subscription.ThreadsafeHandler : subscription.Handler;
+                        handler(new AmqpQueueReceivedMessage(subscription, new RabbitMqReceivedMessage(e)));
+                    }
+                };
 
-                    // Begin consuming messages
-                    Channel.BasicConsume(subscription.QueueName, !subscription.UseAck, consumer);
-                    Console.WriteLine("Subscribed to queue {0} on {1}", subscription.QueueName, this);
-                }
+                // Begin consuming messages
+                Channel.BasicConsume(subscription.QueueName, !subscription.UseAck, consumer);
+                Console.WriteLine("Subscribed to {0} on {1}", subscription.QueueName, subscription.Connection);
+                //}
             }
             catch (Exception ex)
             {
-                Console.WriteLine("Error subscribing to queue {0} on {1}\n\n{2}", subscription.QueueName, this, ex);
+                // If the subscribe retry/reconnect limit hasn't been reach, attempt to restore the connection that was lost
+                if (subscribeRetryCount++ < SubscribeRetryLimit)
+                {
+                    // If there was a problem declaring the exchange, for now close the broker connection and reset the connection state
+                    Console.WriteLine("(retries:{0}) Resetting connection for broker '{1}' - broker error occured:\n{2}\n", subscribeRetryCount, this, ex.Message);
+                    reconnect = true;
+                    Disconnect();
+                }
+                else
+                {
+                    // Abort further reconnection attempts until connection reset
+                    State = AmqpConnectionStates.Aborted;
+                    ConnectionAborted?.Invoke(this, EventArgs.Empty);
+                    Console.WriteLine("Subscription retry limit reached.");
+                }
+
+                // Notify
+                QueueSubscribeError?.Invoke(this, new ExceptionEventArgs(ex));
+
+                // The whole broker connection was just reset, so let it restore the state and abort current actions
+                return ex;
             }
 
             // Add to the list
@@ -568,17 +743,19 @@ namespace CymaticLabs.Unity3D.Amqp.RabbitMq
 
             // Notify
             SubscribedToQueue?.Invoke(subscription);
+
+            return null;
         }
 
         /// <summary>
         /// Removes an existing queue subscription from the connection.
         /// </summary>
         /// <param name="subscription">The subscription to add.</param>
-        public void Unsubscribe(AmqpQueueSubscription subscription)
+        public Exception Unsubscribe(AmqpQueueSubscription subscription)
         {
             if (subscription == null) throw new ArgumentNullException("subscription");
             if (!queueSubscriptions.Contains(subscription)) throw new Exception("Subscription does not exist.");
-            if (!IsConnected) throw new InvalidOperationException("Must be connected before unsubscribing.");
+            if (!IsConnected) return new InvalidOperationException("Must be connected before unsubscribing.");
 
             // Cancel the consumer
             try
@@ -591,7 +768,10 @@ namespace CymaticLabs.Unity3D.Amqp.RabbitMq
             }
             catch (Exception ex)
             {
-                Console.WriteLine("Error on {0} unsubscribing from queue: {1}\n\n{2}", this, subscription.QueueName, ex);
+                // Notify
+                QueueUnsubscribeError?.Invoke(this, new ExceptionEventArgs(ex));
+                Console.WriteLine("Error on {0} unsubscribing from queue: {1}\n{2}\n", this, subscription.QueueName, ex);
+                return ex;
             }
 
             // Remove from list
@@ -599,6 +779,8 @@ namespace CymaticLabs.Unity3D.Amqp.RabbitMq
 
             // Notify
             UnsubscribedFromQueue?.Invoke(subscription);
+
+            return null;
         }
 
         #endregion Queue
@@ -826,6 +1008,66 @@ namespace CymaticLabs.Unity3D.Amqp.RabbitMq
             return exchanges.ToArray();
         }
 
+        /// <summary>
+        /// Gets a list of exchanges for the current connection using an asynchronous request.
+        /// </summary>
+        /// <remarks>
+        /// This method is better suited for Unity 3D since it will not block the game thread while the request is made.
+        /// </remarks>
+        /// <param name="callback">The callback that will receive the results.</param>
+        /// <param name="virtualHost">The optional virtual host to get exchanges for. If NULL the connection's default virtual host is used.</param>
+        public void GetExchangesAsync(ExchangeListEventHandler callback, string virtualHost = null)
+        {
+            if (string.IsNullOrEmpty(Server)) throw new InvalidOperationException("Server cannot be NULL when making a request to its REST API");
+
+            // If not supplied, use the default virtual host
+            if (virtualHost == null) virtualHost = VirtualHost;
+
+            // Create the web request for this broker
+            var url = (WebPort == 443 ? "https" : "http") + "://" + Server + ":" + WebPort.ToString() + "/api/exchanges/" + virtualHost;
+            var request = (HttpWebRequest)WebRequest.Create(url);
+
+            // Add authorization info
+            string authInfo = Username + ":" + Password;
+            authInfo = Convert.ToBase64String(System.Text.Encoding.Default.GetBytes(authInfo));
+            request.Headers["Authorization"] = "Basic " + authInfo;
+
+            // Create a async state object
+            var state = new AsyncExchangeListState(request, callback);
+
+            // Start the async request
+            request.BeginGetResponse(new AsyncCallback(EndGetExchangesAsync), state);
+        }
+
+        // Handles the async result of getting the list of exchanges asynchronously
+        private void EndGetExchangesAsync(IAsyncResult result)
+        {
+            var state = (AsyncExchangeListState)result.AsyncState;
+            var response = (HttpWebResponse)state.Request.EndGetResponse(result);
+
+            // Read the response stream
+            var responseContent = "";
+
+            using (var sr = new StreamReader(response.GetResponseStream()))
+            {
+                responseContent = sr.ReadToEnd();
+            }
+
+            // Ensure the correct response format
+            if (string.IsNullOrEmpty(responseContent) || !responseContent.StartsWith("[")) // we expect a JSON array of exchange data
+            {
+                throw new Exception("Unexpected API response:\n" + responseContent);
+            }
+
+            // Parse the results and return
+            List<AmqpExchange> exchanges = new List<AmqpExchange>();
+            var items = JSON.Parse(responseContent).AsArray;
+            for (var i = 0; i < items.Count; i++) exchanges.Add(AmqpExchange.FromJson(items[i].AsObject));
+
+            // Pass results to callback
+            state.Callback(exchanges.ToArray());
+        }
+
         #endregion Exchanges
 
         #region Queues
@@ -948,6 +1190,66 @@ namespace CymaticLabs.Unity3D.Amqp.RabbitMq
             for (var i = 0; i < items.Count; i++) queues.Add(AmqpQueue.FromJson(items[i].AsObject));
 
             return queues.ToArray();
+        }
+
+        /// <summary>
+        /// Gets a list of queues for the current connection using an asynchronous request.
+        /// </summary>
+        /// <remarks>
+        /// This method is better suited for Unity 3D since it will not block the game thread while the request is made.
+        /// </remarks>
+        /// <param name="callback">The callback that will receive the results.</param>
+        /// <param name="virtualHost">The optional virtual host to get queues for. If NULL the connection's default virtual host is used.</param>
+        public void GetQueuesAsync(QueueListEventHandler callback, string virtualHost = null)
+        {
+            if (string.IsNullOrEmpty(Server)) throw new InvalidOperationException("Server cannot be NULL when making a request to its REST API");
+
+            // If not supplied, use the default virtual host
+            if (virtualHost == null) virtualHost = VirtualHost;
+
+            // Create the web request for this broker
+            var url = (WebPort == 443 ? "https" : "http") + "://" + Server + ":" + WebPort.ToString() + "/api/queues/" + virtualHost;
+            var request = (HttpWebRequest)WebRequest.Create(url);
+
+            // Add authorization info
+            string authInfo = Username + ":" + Password;
+            authInfo = Convert.ToBase64String(System.Text.Encoding.Default.GetBytes(authInfo));
+            request.Headers["Authorization"] = "Basic " + authInfo;
+
+            // Create a async state object
+            var state = new AsyncQueueListState(request, callback);
+
+            // Start the async request
+            request.BeginGetResponse(new AsyncCallback(EndGetQueuesAsync), state);
+        }
+
+        // Handles the async result of getting the list of queues asynchronously
+        private void EndGetQueuesAsync(IAsyncResult result)
+        {
+            var state = (AsyncQueueListState)result.AsyncState;
+            var response = (HttpWebResponse)state.Request.EndGetResponse(result);
+
+            // Read the response stream
+            var responseContent = "";
+
+            using (var sr = new StreamReader(response.GetResponseStream()))
+            {
+                responseContent = sr.ReadToEnd();
+            }
+
+            // Ensure the correct response format
+            if (string.IsNullOrEmpty(responseContent) || !responseContent.StartsWith("[")) // we expect a JSON array of exchange data
+            {
+                throw new Exception("Unexpected API response:\n" + responseContent);
+            }
+
+            // Parse the results and return
+            List<AmqpQueue> queues = new List<AmqpQueue>();
+            var items = JSON.Parse(responseContent).AsArray;
+            for (var i = 0; i < items.Count; i++) queues.Add(AmqpQueue.FromJson(items[i].AsObject));
+
+            // Pass results to callback
+            state.Callback(queues.ToArray());
         }
 
         #endregion Queues

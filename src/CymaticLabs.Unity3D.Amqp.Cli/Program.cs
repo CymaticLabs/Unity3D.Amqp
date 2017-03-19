@@ -143,6 +143,7 @@ namespace CymaticLabs.Unity3D.Amqp.Cli
                 client.Blocked += Client_Blocked;
                 client.Connected += Client_Connected;
                 client.Disconnected += Client_Disconnected;
+                client.ConnectionAborted += Client_ConnectionAborted;
 
                 // If this is an AMQP operation, connect
                 if (command == "rx" || command == "tx")
@@ -151,7 +152,6 @@ namespace CymaticLabs.Unity3D.Amqp.Cli
                     Console.WriteLine("Press enter to exit");
                     client.Connect();
                     Console.ReadLine();
-                    CleanUp();
                     client.Disconnect();
                 }
                 // Otherwise this is a REST API operation so execute it
@@ -190,7 +190,6 @@ namespace CymaticLabs.Unity3D.Amqp.Cli
         private static void Client_Disconnected(object sender, EventArgs e)
         {
             Console.WriteLine("Client disconnected!");
-            Environment.Exit(0);
         }
 
         private static void Client_Connected(object sender, EventArgs e)
@@ -205,8 +204,16 @@ namespace CymaticLabs.Unity3D.Amqp.Cli
                 {
                     // Subscribe to supplied exchange to listen for messages
                     rxExSub = new AmqpExchangeSubscription(exchangeName, exchangeType, routingKey, OnAmqpExchangeMessageReceived);
-                    client.Subscribe(rxExSub);
-                    Console.WriteLine("Listening for messages on exchange: {0}", exchangeName);
+                    var ex = client.Subscribe(rxExSub);
+
+                    if (ex == null)
+                    {
+                        Console.WriteLine("Listening for messages on exchange: {0}", exchangeName);
+                    }
+                    else
+                    {
+                        Console.WriteLine("Error listening for messages");
+                    }
                 }
                 else
                 {
@@ -228,9 +235,13 @@ namespace CymaticLabs.Unity3D.Amqp.Cli
                 }
 
                 // Disconnect
-                CleanUp();
                 client.Disconnect();
             }
+        }
+
+        private static void Client_ConnectionAborted(object sender, EventArgs e)
+        {
+            Console.WriteLine("Client connection aborted!");
         }
 
         private static void Client_Blocked(object sender, EventArgs e)
@@ -255,23 +266,6 @@ namespace CymaticLabs.Unity3D.Amqp.Cli
         #endregion Connection Handlers
 
         #region Utility
-
-        static void CleanUp()
-        {
-            if (command == "rx")
-            {
-                if (rxExSub != null)
-                {
-                    client.Unsubscribe(rxExSub);
-                    Console.WriteLine("Unsubscribed from exchange: {0}", exchangeName);
-                }
-                else if (rxQueueSub != null)
-                {
-                    client.Unsubscribe(rxQueueSub);
-                    Console.WriteLine("Unsubscribed from queue: {0}", queueName);
-                }
-            }
-        }
 
         // Prints the use to the console
         static void PrintUsage(string[] args)

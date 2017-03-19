@@ -181,7 +181,8 @@ namespace CymaticLabs.Unity3D.Amqp
         /// <summary>
         /// Loads AMQP configuration from disk.
         /// </summary>
-        public static void LoadConfiguration()
+        /// <param name="refreshAssets">When True, a refresh of the asset database will be forced.</param>
+        public static void LoadConfiguration(bool refreshAssets = false)
         {
             // Ensure that a AMQP configuration file exists
             EnsureConfigurationFile();
@@ -189,6 +190,12 @@ namespace CymaticLabs.Unity3D.Amqp
             // Look for connections file
             var filename = ConfigurationFilename;
             connections.Clear();
+
+            if (refreshAssets)
+            {
+                // Update Unity assets (needed to get the editor to see these new assets)
+                AssetDatabase.Refresh();
+            }
 
             if (File.Exists(filename))
             {
@@ -248,7 +255,7 @@ namespace CymaticLabs.Unity3D.Amqp
                 var config = new AmqpConfiguration();
                 config.Connections = connections.ToArray();
                 File.WriteAllText(ConfigurationFilename, JsonUtility.ToJson(config, true));
-                LoadConfiguration();
+                LoadConfiguration(true);
             }
             catch (Exception ex)
             {

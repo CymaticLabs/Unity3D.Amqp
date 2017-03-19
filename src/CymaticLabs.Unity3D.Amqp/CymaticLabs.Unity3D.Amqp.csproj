@@ -47,7 +47,11 @@
     <Compile Include="AmqpQueueMessageReceivedEventHandler.cs" />
     <Compile Include="AmqpExchangeReceivedMessage.cs" />
     <Compile Include="AmqpSubscriptionBase.cs" />
+    <Compile Include="AsyncQueueListState.cs" />
+    <Compile Include="AsyncExchangeListState.cs" />
     <Compile Include="ExceptionEventArgs.cs" />
+    <Compile Include="QueueListEventHandler.cs" />
+    <Compile Include="ExchangeListEventHandler.cs" />
     <Compile Include="Extensions\StringExtensions.cs" />
     <Compile Include="Helpers\AmqpHelper.cs" />
     <Compile Include="Helpers\SslHelper.cs" />

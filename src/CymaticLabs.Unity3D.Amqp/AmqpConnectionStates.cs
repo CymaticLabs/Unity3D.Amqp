@@ -29,5 +29,12 @@
         /// The client is currently blocked by the server.
         /// </summary>
         Blocked,
+
+        /// <summary>
+        /// The client has currently aborted trying to connect to the server.
+        /// This requires a call to <see cref="IAmqpBrokerConnection.ResetConnection"/> before
+        /// any further connection attempts.
+        /// </summary>
+        Aborted
     }
 }

@@ -46,6 +46,18 @@ namespace CymaticLabs.Unity3D.Amqp
         [Tooltip("Whether or not AMQP events will be written to the AMQP console.")]
         public bool WriteToConsole = false;
 
+        /// <summary>
+        /// A list of exchange subscriptions to subscribe to when connected.
+        /// </summary>
+        [Tooltip("A list of exchange subscriptions to subscribe to when connected.")]
+        public UnityAmqpExchangeSubscription[] ExchangeSubscriptions;
+
+        /// <summary>
+        /// A list of queue subscriptions to subscribe to when connected.
+        /// </summary>
+        [Tooltip("A list of queue subscriptions to subscribe to when connected.")]
+        public UnityAmqpQueueSubscription[] QueueSubscriptions;
+
         #endregion Inspector
 
         #region Fields
@@ -68,6 +80,9 @@ namespace CymaticLabs.Unity3D.Amqp
         // Flag to tell whether when the client has disconnected from the host
         bool hasDisconnected = false;
 
+        // Flag to tell whether when the client has aborted its connection the host
+        bool hasAborted = false;
+
         // Flag to tell when the client is attempting to reconnect to the host
         bool isReconnecting = false;
 
@@ -87,7 +102,19 @@ namespace CymaticLabs.Unity3D.Amqp
         Queue<AmqpQueueReceivedMessage> queueMessages;
 
         // A queue of incoming unhandled exceptions
-        Queue<System.Exception> exceptions;
+        Queue<Exception> connectionExceptions;
+
+        // A queue of incoming unhandled exchange subscribe exceptions
+        Queue<Exception> exSubscribeExceptions;
+
+        // A queue of incoming unhandled exchange unsubscribe exceptions
+        Queue<Exception> exUnsubscribeExceptions;
+
+        // A queue of incoming unhandled queue subscribe exceptions
+        Queue<Exception> queueSubscribeExceptions;
+
+        // A queue of incoming unhandled queue unsubscribe exceptions
+        Queue<Exception> queueUnsubscribeExceptions;
 
         // A queue of exchange subscribes
         Queue<AmqpExchangeSubscription> subscribedExchanges;
@@ -101,41 +128,38 @@ namespace CymaticLabs.Unity3D.Amqp
         // A queue of exchange unsubscribes
         Queue<AmqpQueueSubscription> unsubscribedQueues;
 
+        // A queue of async results when listing AMQP exchanges
+        Queue<AsyncExchangeListResult> exchangeListResults;
+
+        // A queue of async results when listing AMQP queues
+        Queue<AsyncQueueListResult> queueListResults;
+
         // Whether or not the application is currently quitting
         bool isQuitting = false;
 
-        // The name of the connection to use.
-        string Name;
-
         /// The message broker host.
-        string Host;
+        string host;
 
         /// The message broker AMQP port.
-        int AmqpPort = 5672;
+        int amqpPort = 5672;
 
         /// The message broker web/REST port.
-        int WebPort = 80;
+        int webPort = 80;
 
         /// The message broker's virtual host to use.
-        string VirtualHost;
+        string virtualHost;
 
         /// The username to use.
-        string Username;
+        string username;
 
         /// The password to use.
-        string Password;
+        string password;
 
         /// The interval in seconds for reconnection attempts.
-        short ReconnectInterval = 5;
+        short reconnectInterval = 5;
 
         /// The requested keep-alive heartbeat in seconds.
-        ushort RequestedHeartBeat = 30;
-
-        /// The list of exchange subscriptions to use.
-        UnityAmqpExchangeSubscription[] ExchangeSubscriptions;
-
-        /// The list of queue subscriptions to use.
-        UnityAmqpQueueSubscription[] QueueSubscriptions;
+        ushort requestedHeartBeat = 30;
 
         #endregion Fields
 
@@ -197,6 +221,11 @@ namespace CymaticLabs.Unity3D.Amqp
         public AmqpClientUnityEvent OnReconnecting;
 
         /// <summary>
+        /// Occurs when the client connection has aborted and must be manually reset.
+        /// </summary>
+        public AmqpClientUnityEvent OnConnectionAborted;
+
+        /// <summary>
         /// Occurs when there is a connection error.
         /// </summary>
         public ExceptionUnityEvent OnConnectionError;
@@ -221,6 +250,26 @@ namespace CymaticLabs.Unity3D.Amqp
         /// </summary>
         public AmqpQueueSubscriptionUnityEvent OnUnsubscribedFromQueue;
 
+        /// <summary>
+        /// Occurs when there is an error subscribing to an exchange.
+        /// </summary>
+        public ExceptionUnityEvent OnExchangeSubscribeError;
+
+        /// <summary>
+        /// Occurs when there is an error subscribing to a queue.
+        /// </summary>
+        public ExceptionUnityEvent OnExchangeUnsubscribeError;
+
+        /// <summary>
+        /// Occurs when there is an error unsubscribing from an exchange.
+        /// </summary>
+        public ExceptionUnityEvent OnQueueSubscribeError;
+
+        /// <summary>
+        /// Occurs when there is an error unsubscribing from a queue.
+        /// </summary>
+        public ExceptionUnityEvent OnQueueUnsubscribeError;
+
         #endregion Events
 
         #region Methods
@@ -234,12 +283,18 @@ namespace CymaticLabs.Unity3D.Amqp
             exMessages = new Queue<AmqpExchangeReceivedMessage>();
             queueSubscriptions = new List<AmqpQueueSubscription>();
             queueMessages = new Queue<AmqpQueueReceivedMessage>();
-            exceptions = new Queue<System.Exception>();
+            connectionExceptions = new Queue<Exception>();
+            exSubscribeExceptions = new Queue<Exception>();
+            exUnsubscribeExceptions = new Queue<Exception>();
+            queueSubscribeExceptions = new Queue<Exception>();
+            queueUnsubscribeExceptions = new Queue<Exception>();
             subscribedExchanges = new Queue<AmqpExchangeSubscription>();
             unsubscribedExchanges = new Queue<AmqpExchangeSubscription>();
             subscribedQueues = new Queue<AmqpQueueSubscription>();
             unsubscribedQueues = new Queue<AmqpQueueSubscription>();
             connections = new List<AmqpConnection>();
+            exchangeListResults = new Queue<AsyncExchangeListResult>();
+            queueListResults = new Queue<AsyncQueueListResult>();
 
             // Assign singleton instance
             Instance = this;
@@ -333,8 +388,20 @@ namespace CymaticLabs.Unity3D.Amqp
             if (wasBlocked)
             {
                 wasBlocked = false; // reset the flag for the next event
+                AmqpConsole.Color = Color.red;
                 Log("Connection to AMQP host blocked: {0}", AmqpHelper.GetConnectionInfo(client));
+                AmqpConsole.Color = null;
                 if (OnBlocked != null) OnBlocked.Invoke(this);
+            }
+
+            // The client connection has aborted
+            if (hasAborted)
+            {
+                hasAborted = false; // reset the flag for the next event
+                AmqpConsole.Color = Color.red;
+                Log("Connection to AMQP host aborted: {0}", AmqpHelper.GetConnectionInfo(client));
+                AmqpConsole.Color = null;
+                if (OnConnectionAborted != null) OnConnectionAborted.Invoke(this);
             }
 
             // It's safe to subscribe so restore subscriptions
@@ -350,21 +417,118 @@ namespace CymaticLabs.Unity3D.Amqp
 
             #region Process Exceptions
 
-            if (exceptions.Count > 0)
+            // Connection Exceptions
+            if (connectionExceptions.Count > 0)
             {
-                var errors = new System.Exception[exceptions.Count];
+                var errors = new Exception[connectionExceptions.Count];
 
                 lock(this)
                 {
                     // Copy the list and clear queue
-                    exceptions.CopyTo(errors, 0);
-                    exceptions.Clear();
+                    connectionExceptions.CopyTo(errors, 0);
+                    connectionExceptions.Clear();
                 }
 
                 foreach (var ex in errors)
                 {
                     // Notify
                     if (OnConnectionError != null) OnConnectionError.Invoke(ex);
+
+                    // Log
+                    AmqpConsole.Color = Color.red;
+                    Log("{0}", ex);
+                    AmqpConsole.Color = null;
+                }
+            }
+
+            // Exchange Subscribe Exceptions
+            if (exSubscribeExceptions.Count > 0)
+            {
+                var errors = new Exception[exSubscribeExceptions.Count];
+
+                lock (this)
+                {
+                    // Copy the list and clear queue
+                    exSubscribeExceptions.CopyTo(errors, 0);
+                    exSubscribeExceptions.Clear();
+                }
+
+                foreach (var ex in errors)
+                {
+                    // Notify
+                    if (OnExchangeSubscribeError != null) OnExchangeSubscribeError.Invoke(ex);
+
+                    // Log
+                    AmqpConsole.Color = Color.red;
+                    Log("{0}", ex);
+                    AmqpConsole.Color = null;
+                }
+            }
+
+            // Exchange Unsubscribe Exceptions
+            if (exUnsubscribeExceptions.Count > 0)
+            {
+                var errors = new Exception[exUnsubscribeExceptions.Count];
+
+                lock (this)
+                {
+                    // Copy the list and clear queue
+                    exUnsubscribeExceptions.CopyTo(errors, 0);
+                    exUnsubscribeExceptions.Clear();
+                }
+
+                foreach (var ex in errors)
+                {
+                    // Notify
+                    if (OnExchangeUnsubscribeError != null) OnExchangeUnsubscribeError.Invoke(ex);
+
+                    // Log
+                    AmqpConsole.Color = Color.red;
+                    Log("{0}", ex);
+                    AmqpConsole.Color = null;
+                }
+            }
+
+            // Queue Subscribe Exceptions
+            if (exSubscribeExceptions.Count > 0)
+            {
+                var errors = new Exception[queueSubscribeExceptions.Count];
+
+                lock (this)
+                {
+                    // Copy the list and clear queue
+                    queueSubscribeExceptions.CopyTo(errors, 0);
+                    queueSubscribeExceptions.Clear();
+                }
+
+                foreach (var ex in errors)
+                {
+                    // Notify
+                    if (OnQueueSubscribeError != null) OnQueueSubscribeError.Invoke(ex);
+
+                    // Log
+                    AmqpConsole.Color = Color.red;
+                    Log("{0}", ex);
+                    AmqpConsole.Color = null;
+                }
+            }
+
+            // Queue Unsubscribe Exceptions
+            if (queueUnsubscribeExceptions.Count > 0)
+            {
+                var errors = new Exception[queueUnsubscribeExceptions.Count];
+
+                lock (this)
+                {
+                    // Copy the list and clear queue
+                    queueUnsubscribeExceptions.CopyTo(errors, 0);
+                    queueUnsubscribeExceptions.Clear();
+                }
+
+                foreach (var ex in errors)
+                {
+                    // Notify
+                    if (OnQueueUnsubscribeError != null) OnQueueUnsubscribeError.Invoke(ex);
 
                     // Log
                     AmqpConsole.Color = Color.red;
@@ -514,6 +678,44 @@ namespace CymaticLabs.Unity3D.Amqp
             }
 
             #endregion Process Incoming Messages
+
+            #region Process Async Exchange Listings
+
+            if (exchangeListResults.Count > 0)
+            {
+                var results = new AsyncExchangeListResult[exchangeListResults.Count];
+
+                lock (this)
+                {
+                    // Copy the list and clear queue
+                    exchangeListResults.CopyTo(results, 0);
+                    exchangeListResults.Clear();
+                }
+
+                // Invoke the callbacks and pass the results
+                foreach (var result in results) result.Callback(result.ExchangeList);
+            }
+
+            #endregion Process Async Exchange Listings
+
+            #region Process Async Queue Listings
+
+            if (queueListResults.Count > 0)
+            {
+                var results = new AsyncQueueListResult[queueListResults.Count];
+
+                lock (this)
+                {
+                    // Copy the list and clear queue
+                    queueListResults.CopyTo(results, 0);
+                    queueListResults.Clear();
+                }
+
+                // Invoke the callbacks and pass the results
+                foreach (var result in results) result.Callback(result.QueueList);
+            }
+
+            #endregion Process Async Queue Listings
         }
 
         #endregion Update
@@ -586,10 +788,15 @@ namespace CymaticLabs.Unity3D.Amqp
                 client.Disconnected -= Client_Disconnected;
                 client.Reconnecting -= Client_Reconnecting;
                 client.ConnectionError -= Client_ConnectionError;
+                client.ConnectionAborted -= Client_ConnectionAborted;
                 client.SubscribedToExchange -= Client_SubscribedToExchange;
                 client.UnsubscribedFromExchange -= Client_UnsubscribedFromExchange;
                 client.SubscribedToQueue -= Client_SubscribedToQueue;
                 client.UnsubscribedFromQueue -= Client_UnsubscribedFromQueue;
+                client.ExchangeSubscribeError -= Client_ExchangeSubscribeError;
+                client.ExchangeUnsubscribeError -= Client_ExchangeUnsubscribeError;
+                client.QueueSubscribeError -= Client_QueueSubscribeError;
+                client.QueueUnsubscribeError -= Client_QueueUnsubscribeError;
             }
 
             // Find the connection by name
@@ -597,27 +804,32 @@ namespace CymaticLabs.Unity3D.Amqp
 
             if (c != null)
             {
-                Host = c.Host;
-                AmqpPort = c.AmqpPort;
-                WebPort = c.WebPort;
-                VirtualHost = c.VirtualHost;
-                Username = c.Username;
-                Password = c.Password;
-                ReconnectInterval = c.ReconnectInterval;
-                RequestedHeartBeat = c.RequestedHeartBeat;
+                host = c.Host;
+                amqpPort = c.AmqpPort;
+                webPort = c.WebPort;
+                virtualHost = c.VirtualHost;
+                username = c.Username;
+                password = c.Password;
+                reconnectInterval = c.ReconnectInterval;
+                requestedHeartBeat = c.RequestedHeartBeat;
             }
 
             // Create the client for the connection
-            client = AmqpConnectionFactory.Create(Host, AmqpPort, WebPort, VirtualHost, Username, Password, ReconnectInterval, RequestedHeartBeat);
+            client = AmqpConnectionFactory.Create(host, amqpPort, webPort, virtualHost, username, password, reconnectInterval, requestedHeartBeat);
             client.Blocked += Client_Blocked;
             client.Connected += Client_Connected;
             client.Disconnected += Client_Disconnected;
             client.Reconnecting += Client_Reconnecting;
             client.ConnectionError += Client_ConnectionError;
+            client.ConnectionAborted += Client_ConnectionAborted;
             client.SubscribedToExchange += Client_SubscribedToExchange;
             client.UnsubscribedFromExchange += Client_UnsubscribedFromExchange;
             client.SubscribedToQueue += Client_SubscribedToQueue;
             client.UnsubscribedFromQueue += Client_UnsubscribedFromQueue;
+            client.ExchangeSubscribeError += Client_ExchangeSubscribeError;
+            client.ExchangeUnsubscribeError += Client_ExchangeUnsubscribeError;
+            client.QueueSubscribeError += Client_QueueSubscribeError;
+            client.QueueUnsubscribeError += Client_QueueUnsubscribeError;
 
             // Connect the client
             Log("Connecting to AMQP host: {0}", AmqpHelper.GetConnectionInfo(client));
@@ -651,7 +863,7 @@ namespace CymaticLabs.Unity3D.Amqp
 
         #endregion Connection
 
-        #region Connection Handlers
+        #region Event Handlers
 
         // Handles a connection being blocked
         private void Client_Blocked(object sender, System.EventArgs e)
@@ -695,7 +907,16 @@ namespace CymaticLabs.Unity3D.Amqp
         {
             lock(this)
             {
-                exceptions.Enqueue(e.Exception);
+                connectionExceptions.Enqueue(e.Exception);
+            }
+        }
+
+        // Handles when the client connection is aborted
+        private void Client_ConnectionAborted(object sender, EventArgs e)
+        {
+            lock(this)
+            {
+                hasAborted = true;
             }
         }
 
@@ -735,6 +956,42 @@ namespace CymaticLabs.Unity3D.Amqp
             }
         }
 
+        // Handles when an exchange subscribe error occurs
+        private void Client_ExchangeSubscribeError(object sender, ExceptionEventArgs e)
+        {
+            lock (this)
+            {
+                exSubscribeExceptions.Enqueue(e.Exception);
+            }
+        }
+
+        // Handles when an exchange unsubscribe error occurs
+        private void Client_ExchangeUnsubscribeError(object sender, ExceptionEventArgs e)
+        {
+            lock (this)
+            {
+                exUnsubscribeExceptions.Enqueue(e.Exception);
+            }
+        }
+
+        // Handles when a queue subscribe error occurs
+        private void Client_QueueSubscribeError(object sender, ExceptionEventArgs e)
+        {
+            lock (this)
+            {
+                queueSubscribeExceptions.Enqueue(e.Exception);
+            }
+        }
+
+        // Handles when a queue unsubscribe error occurs
+        private void Client_QueueUnsubscribeError(object sender, ExceptionEventArgs e)
+        {
+            lock (this)
+            {
+                queueUnsubscribeExceptions.Enqueue(e.Exception);
+            }
+        }
+
         // Handles when a message is received from the client
         void Client_ExchangeMessageReceived(AmqpExchangeReceivedMessage received)
         {
@@ -759,7 +1016,7 @@ namespace CymaticLabs.Unity3D.Amqp
             }
         }
 
-        #endregion Connection Handlers
+        #endregion Event Handlers
 
         #region Subscriptions
 
@@ -1122,6 +1379,51 @@ namespace CymaticLabs.Unity3D.Amqp
             return client.GetExchanges(virtualHost);
         }
 
+        /// <summary>
+        /// Gets a list of exchanges for the current connection using an asynchronous request.
+        /// </summary>
+        /// <remarks>
+        /// This method is better suited for Unity 3D since it will not block the game thread while the request is made.
+        /// </remarks>
+        /// <param name="callback">The callback that will receive the results.</param>
+        /// <param name="virtualHost">The optional virtual host to get exchanges for. If NULL the connection's default virtual host is used.</param>
+        public static void GetExchangesAsync(ExchangeListEventHandler callback, string virtualHost = null)
+        {
+            if (Instance == null)
+            {
+                if (callback != null) callback(new AmqpExchange[0]);
+                return;
+            }
+
+            Instance.GetExchangeListAsync(callback, virtualHost);
+        }
+
+        /// <summary>
+        /// Gets a list of exchanges for the current connection using an asynchronous request.
+        /// </summary>
+        /// <remarks>
+        /// This method is better suited for Unity 3D since it will not block the game thread while the request is made.
+        /// </remarks>
+        /// <param name="callback">The callback that will receive the results.</param>
+        /// <param name="virtualHost">The optional virtual host to get exchanges for. If NULL the connection's default virtual host is used.</param>
+        public void GetExchangeListAsync(ExchangeListEventHandler callback, string virtualHost = null)
+        {
+            if (!IsConnected)
+            {
+                if (callback != null) callback(new AmqpExchange[0]);
+                return;
+            }
+
+            client.GetExchangesAsync((exchangeList) =>
+            {
+                // Queue the results to be handled on the game thread
+                lock(this)
+                {
+                    exchangeListResults.Enqueue(new AsyncExchangeListResult(callback, exchangeList));
+                }
+            }, virtualHost);
+        }
+
         #endregion Exchanges
 
         #region Queues
@@ -1223,6 +1525,51 @@ namespace CymaticLabs.Unity3D.Amqp
         {
             if (!IsConnected) return new AmqpQueue[0];
             return client.GetQueues(virtualHost);
+        }
+
+        /// <summary>
+        /// Gets a list of queues for the current connection using an asynchronous request.
+        /// </summary>
+        /// <remarks>
+        /// This method is better suited for Unity 3D since it will not block the game thread while the request is made.
+        /// </remarks>
+        /// <param name="callback">The callback that will receive the results.</param>
+        /// <param name="virtualHost">The optional virtual host to get queues for. If NULL the connection's default virtual host is used.</param>
+        public static void GetQueuesAsync(QueueListEventHandler callback, string virtualHost = null)
+        {
+            if (Instance == null)
+            {
+                if (callback != null) callback(new AmqpQueue[0]);
+                return;
+            }
+
+            Instance.GetQueueListAsync(callback, virtualHost);
+        }
+
+        /// <summary>
+        /// Gets a list of queues for the current connection using an asynchronous request.
+        /// </summary>
+        /// <remarks>
+        /// This method is better suited for Unity 3D since it will not block the game thread while the request is made.
+        /// </remarks>
+        /// <param name="callback">The callback that will receive the results.</param>
+        /// <param name="virtualHost">The optional virtual host to get queues for. If NULL the connection's default virtual host is used.</param>
+        public void GetQueueListAsync(QueueListEventHandler callback, string virtualHost = null)
+        {
+            if (!IsConnected)
+            {
+                if (callback != null) callback(new AmqpQueue[0]);
+                return;
+            }
+
+            client.GetQueuesAsync((queueList) =>
+            {
+                // Queue the results to be handled on the game thread
+                lock (this)
+                {
+                    queueListResults.Enqueue(new AsyncQueueListResult(callback, queueList));
+                }
+            }, virtualHost);
         }
 
         #endregion Queues

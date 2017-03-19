@@ -93,6 +93,8 @@
     <Compile Include="Assets\CymaticLabs\Amqp\Scripts\AmqpExchangeSubscriptionUnityEvent.cs" />
     <Compile Include="Assets\CymaticLabs\Amqp\Scripts\AmqpQueueMessageReceivedUnityEvent.cs" />
     <Compile Include="Assets\CymaticLabs\Amqp\Scripts\AmqpQueueSubscriptionUnityEvent.cs" />
+    <Compile Include="Assets\CymaticLabs\Amqp\Scripts\AsyncQueueListResult.cs" />
+    <Compile Include="Assets\CymaticLabs\Amqp\Scripts\AsyncExchangeListResult.cs" />
     <Compile Include="Assets\CymaticLabs\Amqp\Scripts\ExceptionUnityEvent.cs" />
     <Compile Include="Assets\CymaticLabs\Amqp\Scripts\UnityAmqpExchangeSubscription.cs" />
     <Compile Include="Assets\CymaticLabs\Amqp\Scripts\UnityAmqpQueueSubscription.cs" />

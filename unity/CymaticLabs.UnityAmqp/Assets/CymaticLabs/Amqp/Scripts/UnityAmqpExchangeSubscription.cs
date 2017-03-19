@@ -15,15 +15,6 @@ namespace CymaticLabs.Unity3D.Amqp
         public AmqpExchangeMessageReceivedUnityEvent OnMessageReceived;
 
         /// <summary>
-        /// Empty constructor.
-        /// </summary>
-        public UnityAmqpExchangeSubscription()
-        {
-            Enabled = true; // default to enabled
-            RoutingKey = "";
-        }
-
-        /// <summary>
         /// Creates a new exchange subscription.
         /// </summary>
         /// <param name="exchangeName">The name of the exchange to subscribe to.</param>
