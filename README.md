@@ -158,28 +158,37 @@ You can look for the **AmqpClient** prefab or just drag the script onto a GameOb
 
 ![AmqpClient in Unity Inspector](docs/img/amqp-client-inspector-1.png)
 
-Here's a quick description of the script's inspector properties:
+**Properties:**
 
 * **Connection** - The AMQP connection to use that was configured with the AMQP configuration editor
 * **Connect On Start** - When enabled the script will attempt to establish a connection to the AMQP server on Start()
 * **Relaxed Ssl Validation** - When enabled SSL certificate validation from the AMQP server will be relaxed ([see details](#ssl-support))
 * **Write To Console** - When enabled important AMQP log details will be written to the included AmqpConsole class/prefab (optional)
+* **Exchange Subscriptions** - (optional) A list of exchange subscriptions to apply upon connectiong to the host. **You must supply the correct exchange type for your subscription**. RabbitMQ client drops the connection when subscribing to an exchange and supplying the wrong exchange type (for example 'fanout' when it should be 'topic). This will cause a loop of connect → subscribe → error → disconnect → reconnect → repeat. There is a safety measure built in to this library that prevents an infinite loop but will essentially disable the connection when this loop is detected. If you are unsure of an exchange's type, either look in RabbitMQ server's administration panel or use the AmqpClient.GetExchanges() or AmqpClient.GetExchangesAsync() to return a list of available exchanges and their declared types.
+* **Queue Subscriptions** - (optional) A list of direct queue subscriptions to apply upon connecting to the host
 
-Events:
+**Events:**
 
 * **On Connected** - Occurs when the client successfully connects to the server
 * **On Disconnected** - Occurs when the client disconnects from the server
 * **On Blocked** - Occurs if the client is blocked by the server
 * **On Reconnecting** - Occurs each reconnection attempt made by the client when a connection becomes unavailable
 * **On Connection Error** - Occurs when the client experiences a connection error
+* **On Connection Aborted** - Occurs when the client has its connection aborted; this means that the client has failed in a loop of reconnection attempts and will no longer be able to connect until `AmqpClient.ResetConnection()` is called manually
 * **On Subscribed To Exchange** - Occurs when the client successfully subscribes to an exchange
 * **On Unsubscribed From Exchange** - Occurs when the client successfully unsubscribes from an exchange
 * **On Subscribed To Queue** - Occurs when the client successfully subscribes to a queue
 * **On Unsubscribed From Queue** - Occurs when the client successfully unsubscribes from a queue
+* **On Exchange Subscribe Error** - Occurs when there is an error subscribing to an exchange
+* **On Exchange Unsubscribe Error** - Occurs when there is an error unsubscribing from an exchange
+* **On Queue Subscribe Error** - Occurs when there is an error subscribing to a queue
+* **On Queue Unsubscribe Error** - Occurs when there is an error unsubscribing from a queue
 
 ## Thread Safety
 
 Unity's main game thread cannot directly interact with the thread(s) that the AMQP messaging functions occur on. If you try to call UnityEngine code directly from events that occur in the underlying AMQP client you will likely experience unhandled exceptions telling you such interactions are not allowed. The **AmqpClient** class (which subclasses MonoBehaviour) implements a thread-safe pattern. Within the **AmqpClient** class, client connection events (such as connect, disconnect, reconnect, blocked, subscribed, etc.) and received message events are quickly queued in thread-safe variables and then processed on the **Update()** method of **AmqpClient** to allow safe interaction with Unity's main game thread. Be aware of this limitation when working with this library.
+
+Most of the patterns and methods in **AmqpClient** play nice with Unity's threading requirements. However the methods `AmqpClient.GetExchanges()` and `AmqpClient.GetQueues` runs synchronously and will block Unity's thread making the game loop unresponsive. Depending on your needs the delay might be neglibable. However you can also use the `AmqpClient.GetExchangesAsync()` and `AmqpClient.GetQueuesAsync()` methods for an asynchronous alternative; it's just a little bit more complicated to implement. You can look at the **AmqpDemo** scene and **AmqpConnectionForm** script for an examples of how to do this since it uses this approach to populate the exchange drop down lists upon connecting to a host.
 
 ## SSL Support
 
