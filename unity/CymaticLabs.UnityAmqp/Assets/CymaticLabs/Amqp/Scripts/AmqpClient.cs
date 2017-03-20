@@ -437,7 +437,7 @@ namespace CymaticLabs.Unity3D.Amqp
             }
 
             // It's safe to subscribe so restore subscriptions
-            if (canSubscribe)
+            if (canSubscribe && IsConnected)
             {
                 canSubscribe = false; // reset the flag for the next event
                 RestoreSubscriptions();
@@ -1095,7 +1095,7 @@ namespace CymaticLabs.Unity3D.Amqp
             exSubscriptions.Add(subscription);
 
             // Process new subscriptions if we're currently connected
-            if (client.IsConnected) canSubscribe = true;
+            canSubscribe = true;
         }
 
         /// <summary>
@@ -1120,7 +1120,7 @@ namespace CymaticLabs.Unity3D.Amqp
             queueSubscriptions.Add(subscription);
 
             // Process new subscriptions if we're currently connected
-            if (client.IsConnected) canSubscribe = true;
+            canSubscribe = true;
         }
 
         // Restores the current list of subscriptions
