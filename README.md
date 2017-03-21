@@ -24,6 +24,7 @@ This project offers the following:
   - [.NET RabbitMQ client 3.4.4](#net-rabbitmq-client-344)
 - [Installation](#installation)
 - [Quick Start](#quick-start)
+- [Tutorials](https://github.com/CymaticLabs/Unity3D.Amqp/wiki/Tutorials)
 - [Thread Safety](#thread-safety)
 - [SSL Support](#ssl-support)
 - [License](#license)
