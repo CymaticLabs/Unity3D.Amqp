@@ -46,47 +46,47 @@ namespace CymaticLabs.Unity3D.Amqp.RabbitMq
         /// <summary>
         /// The name of the broker connection.
         /// </summary>
-        public string Name { get; private set; }
+        public string Name { get; set; }
 
         /// <summary>
         /// The name or IP of the host broker.
         /// </summary>
-        public string Server { get; private set; }
+        public string Server { get; set; }
 
         /// <summary>
         /// The host broker's AMQP port number.
         /// </summary>
-        public int AmqpPort { get; private set; }
+        public int AmqpPort { get; set; }
 
         /// <summary>
         /// The host broker's web/REST API port number.
         /// </summary>
-        public int WebPort { get; private set; }
+        public int WebPort { get; set; }
 
         /// <summary>
         /// The broker vhost to use. Default is '/'.
         /// </summary>
-        public string VirtualHost { get; private set; }
+        public string VirtualHost { get; set; }
 
         /// <summary>
         /// The username for the client connection.
         /// </summary>
-        public string Username { get; private set; }
+        public string Username { get; set; }
 
         /// <summary>
         /// The password for the client connection.
         /// </summary>
-        public string Password { get; private set; }
+        public string Password { get; set; }
 
         /// <summary>
         /// Gets the number of seconds between reconnection attempts.
         /// </summary>
-        public short ReconnectInterval { get; private set; }
+        public short ReconnectInterval { get; set; }
 
         /// <summary>
         /// Gets the requested server/client heartbeat in seconds.
         /// </summary>
-        public ushort RequestedHeartbeat { get; private set; }
+        public ushort RequestedHeartbeat { get; set; }
 
         /// <summary>
         /// Gets or sets the maximum number of times the client will attempt to reconnect to the host before aborting.
@@ -158,6 +158,11 @@ namespace CymaticLabs.Unity3D.Amqp.RabbitMq
         /// Occurs when the client disconnects from the broker.
         /// </summary>
         public event EventHandler Disconnected;
+
+        /// <summary>
+        /// Occurs when the client starts the disconnection process, but before it has disconnected.
+        /// </summary>
+        public event EventHandler Disconnecting;
 
         /// <summary>
         /// Occurs when the client is blocked from the broker.
@@ -433,6 +438,7 @@ namespace CymaticLabs.Unity3D.Amqp.RabbitMq
             }
 
             Console.WriteLine("Disconnecting from {0}...", this);
+            Disconnecting?.Invoke(this, EventArgs.Empty);
 
             exchangeSubscriptions.Clear();
             Connection.Close();

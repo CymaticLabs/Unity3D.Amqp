@@ -77,6 +77,9 @@ namespace CymaticLabs.Unity3D.Amqp
         // Flag used to tell when the client has connected to the host
         bool hasConnected = false;
 
+        // Whether or not the client has begun graceful disconnection
+        bool isDisconnecting = false;
+
         // Flag to tell whether when the client has disconnected from the host
         bool hasDisconnected = false;
 
@@ -236,6 +239,11 @@ namespace CymaticLabs.Unity3D.Amqp
         /// Occurs when the client has connected to the AMQP message broker.
         /// </summary>
         public AmqpClientUnityEvent OnConnected;
+
+        /// <summary>
+        /// Occurs when the client has begun disconnecting from the AMQP message broker, but before it has finished.
+        /// </summary>
+        public AmqpClientUnityEvent OnDisconnecting;
 
         /// <summary>
         /// Occurs when the client has disconnected from the AMQP message broker.
@@ -406,6 +414,13 @@ namespace CymaticLabs.Unity3D.Amqp
                 hasDisconnected = false; // reset the flag for the next event
                 Log("Disconnected from AMQP host {0}", AmqpHelper.GetConnectionInfo(client));
                 if (OnDisconnected != null) OnDisconnected.Invoke(this);
+            }
+
+            // Handle client graceful disconnect
+            if (isDisconnecting)
+            {
+                isDisconnecting = false;
+                StartCoroutine(DelayDisconnection(2));
             }
 
             // The client has disconnected
@@ -812,25 +827,6 @@ namespace CymaticLabs.Unity3D.Amqp
                 return;
             }
 
-            // If a client already exists, unregister from events
-            if (client != null)
-            {
-                client.Blocked -= Client_Blocked;
-                client.Connected -= Client_Connected;
-                client.Disconnected -= Client_Disconnected;
-                client.Reconnecting -= Client_Reconnecting;
-                client.ConnectionError -= Client_ConnectionError;
-                client.ConnectionAborted -= Client_ConnectionAborted;
-                client.SubscribedToExchange -= Client_SubscribedToExchange;
-                client.UnsubscribedFromExchange -= Client_UnsubscribedFromExchange;
-                client.SubscribedToQueue -= Client_SubscribedToQueue;
-                client.UnsubscribedFromQueue -= Client_UnsubscribedFromQueue;
-                client.ExchangeSubscribeError -= Client_ExchangeSubscribeError;
-                client.ExchangeUnsubscribeError -= Client_ExchangeUnsubscribeError;
-                client.QueueSubscribeError -= Client_QueueSubscribeError;
-                client.QueueUnsubscribeError -= Client_QueueUnsubscribeError;
-            }
-
             // Find the connection by name
             var c = GetConnection(Connection);
 
@@ -847,21 +843,37 @@ namespace CymaticLabs.Unity3D.Amqp
             }
 
             // Create the client for the connection
-            client = AmqpConnectionFactory.Create(host, amqpPort, webPort, virtualHost, username, password, reconnectInterval, requestedHeartBeat);
-            client.Blocked += Client_Blocked;
-            client.Connected += Client_Connected;
-            client.Disconnected += Client_Disconnected;
-            client.Reconnecting += Client_Reconnecting;
-            client.ConnectionError += Client_ConnectionError;
-            client.ConnectionAborted += Client_ConnectionAborted;
-            client.SubscribedToExchange += Client_SubscribedToExchange;
-            client.UnsubscribedFromExchange += Client_UnsubscribedFromExchange;
-            client.SubscribedToQueue += Client_SubscribedToQueue;
-            client.UnsubscribedFromQueue += Client_UnsubscribedFromQueue;
-            client.ExchangeSubscribeError += Client_ExchangeSubscribeError;
-            client.ExchangeUnsubscribeError += Client_ExchangeUnsubscribeError;
-            client.QueueSubscribeError += Client_QueueSubscribeError;
-            client.QueueUnsubscribeError += Client_QueueUnsubscribeError;
+            if (client == null)
+            {
+                client = AmqpConnectionFactory.Create(host, amqpPort, webPort, virtualHost, username, password, reconnectInterval, requestedHeartBeat);
+                client.Blocked += Client_Blocked;
+                client.Connected += Client_Connected;
+                client.Disconnected += Client_Disconnected;
+                client.Disconnecting += Client_Disconnecting;
+                client.Reconnecting += Client_Reconnecting;
+                client.ConnectionError += Client_ConnectionError;
+                client.ConnectionAborted += Client_ConnectionAborted;
+                client.SubscribedToExchange += Client_SubscribedToExchange;
+                client.UnsubscribedFromExchange += Client_UnsubscribedFromExchange;
+                client.SubscribedToQueue += Client_SubscribedToQueue;
+                client.UnsubscribedFromQueue += Client_UnsubscribedFromQueue;
+                client.ExchangeSubscribeError += Client_ExchangeSubscribeError;
+                client.ExchangeUnsubscribeError += Client_ExchangeUnsubscribeError;
+                client.QueueSubscribeError += Client_QueueSubscribeError;
+                client.QueueUnsubscribeError += Client_QueueUnsubscribeError;
+            }
+            // Or reuse it if possibly
+            else
+            {
+                client.Server = c.Host;
+                client.AmqpPort = c.AmqpPort;
+                client.WebPort = c.WebPort;
+                client.VirtualHost = c.VirtualHost;
+                client.Username = username;
+                client.Password = password;
+                client.ReconnectInterval = c.ReconnectInterval;
+                client.RequestedHeartbeat = c.RequestedHeartBeat;
+            }
 
             // Connect the client
             Log("Connecting to AMQP host: {0}", AmqpHelper.GetConnectionInfo(client));
@@ -882,7 +894,7 @@ namespace CymaticLabs.Unity3D.Amqp
         /// </summary>
         public void DisconnectFromHost()
         {
-            if (client == null && !client.IsConnected)
+            if (client == null || !client.IsConnected)
             {
                 Log("AmqpClient is not connected and cannot disconnect");
                 return;
@@ -890,13 +902,21 @@ namespace CymaticLabs.Unity3D.Amqp
 
             // Connect the client
             Log("Disconnecting from AMQP host: {0}", AmqpHelper.GetConnectionInfo(client));
-            client.Disconnect();
+            if (OnDisconnecting != null) OnDisconnecting.Invoke(this);
+            isDisconnecting = true;
+        }
+
+        // Delays true client disconnectiong by a number of seconds
+        IEnumerator DelayDisconnection(float delay)
+        {
+            yield return new WaitForSeconds(delay);
+            if (client != null) client.Disconnect();
         }
 
         /// <summary>
         /// Resets the connection when it has ended up in an aborted state.
         /// </summary>
-        public static void DiscoResetConnection()
+        public static void ResetConnection()
         {
             if (Instance == null) return;
             Instance.ResetConnectionToHost();
@@ -934,6 +954,15 @@ namespace CymaticLabs.Unity3D.Amqp
             {
                 hasConnected= true;
                 canSubscribe = true;
+            }
+        }
+
+        // Handles when the client starts disconnecting
+        private void Client_Disconnecting(object sender, System.EventArgs e)
+        {
+            lock (this)
+            {
+                isDisconnecting = true;
             }
         }
 

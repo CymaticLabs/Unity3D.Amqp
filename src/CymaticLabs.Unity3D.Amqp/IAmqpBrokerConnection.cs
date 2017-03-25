@@ -13,42 +13,42 @@ namespace CymaticLabs.Unity3D.Amqp
         /// <summary>
         /// The name or IP of the host broker.
         /// </summary>
-        string Server { get; }
+        string Server { get; set; }
 
         /// <summary>
         /// The host broker's AMQP port number.
         /// </summary>
-        int AmqpPort { get; }
+        int AmqpPort { get; set; }
 
         /// <summary>
         /// The host broker's web/REST API port number.
         /// </summary>
-        int WebPort { get; }
+        int WebPort { get; set; }
 
         /// <summary>
         /// The broker vhost to use. Default is '/'.
         /// </summary>
-        string VirtualHost { get; }
+        string VirtualHost { get; set; }
 
         /// <summary>
         /// The username for the client connection.
         /// </summary>
-        string Username { get; }
+        string Username { get; set; }
 
         /// <summary>
         /// The password for the client connection.
         /// </summary>
-        string Password { get; }
+        string Password { get; set; }
 
         /// <summary>
         /// Gets the number of seconds between reconnection attempts.
         /// </summary>
-        short ReconnectInterval { get; }
+        short ReconnectInterval { get; set; }
 
         /// <summary>
         /// Gets the requested server/client heartbeat in seconds.
         /// </summary>
-        ushort RequestedHeartbeat { get; }
+        ushort RequestedHeartbeat { get; set; }
 
         /// <summary>
         /// Gets or sets the maximum number of times the client will attempt to reconnect to the host before aborting.
@@ -89,6 +89,11 @@ namespace CymaticLabs.Unity3D.Amqp
         /// Occurs when the client disconnects from the broker.
         /// </summary>
         event EventHandler Disconnected;
+
+        /// <summary>
+        /// Occurs when the client starts the disconnection process, but before it has disconnected.
+        /// </summary>
+        event EventHandler Disconnecting;
 
         /// <summary>
         /// Occurs when the client is blocked from the broker.
