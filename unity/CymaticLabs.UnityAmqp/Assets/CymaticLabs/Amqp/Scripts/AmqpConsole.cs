@@ -561,6 +561,7 @@ namespace CymaticLabs.Unity3D.Amqp.UI
         /// <param name="timestamp">Whether or not to include a time stamp.</param>
         public static void WriteLine(object value, bool timestamp)
         {
+            if (Instance == null) return;
             Color c = new Color(1, 1, 1);
             if (Color != null) c = (Color)Color;
             var text = string.Format("<color={0}>{1}</color>", ToRGBHex(c), value);
