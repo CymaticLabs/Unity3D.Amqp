@@ -13,11 +13,13 @@
     <TargetFrameworkIdentifier>.NETFramework</TargetFrameworkIdentifier>
     <TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
     <TargetFrameworkProfile>Unity Subset v3.5</TargetFrameworkProfile>
-    <CompilerResponseFile></CompilerResponseFile>
+    <CompilerResponseFile>
+    </CompilerResponseFile>
     <UnityProjectType>Game:1</UnityProjectType>
     <UnityBuildTarget>StandaloneWindows:5</UnityBuildTarget>
     <UnityVersion>5.5.2f1</UnityVersion>
-    <RootNamespace></RootNamespace>
+    <RootNamespace>
+    </RootNamespace>
     <LangVersion Condition=" '$(VisualStudioVersion)' != '10.0' ">4</LangVersion>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
@@ -92,6 +94,7 @@
     <Compile Include="Assets\CymaticLabs\Amqp\Scripts\AmqpConfiguration.cs" />
     <Compile Include="Assets\CymaticLabs\Amqp\Scripts\AmqpConnection.cs" />
     <Compile Include="Assets\CymaticLabs\Amqp\Scripts\AmqpConsole.cs" />
+    <Compile Include="Assets\CymaticLabs\Amqp\Scripts\AmqpException.cs" />
     <Compile Include="Assets\CymaticLabs\Amqp\Scripts\AmqpExchangeMessageReceivedUnityEvent.cs" />
     <Compile Include="Assets\CymaticLabs\Amqp\Scripts\AmqpExchangeSubscriptionUnityEvent.cs" />
     <Compile Include="Assets\CymaticLabs\Amqp\Scripts\AmqpQueueMessageReceivedUnityEvent.cs" />
@@ -100,6 +103,8 @@
     <Compile Include="Assets\CymaticLabs\Amqp\Scripts\AsyncQueueListResult.cs" />
     <Compile Include="Assets\CymaticLabs\Amqp\Scripts\Examples\AmqpConnectionForm.cs" />
     <Compile Include="Assets\CymaticLabs\Amqp\Scripts\Examples\AmqpObjectController.cs" />
+    <Compile Include="Assets\CymaticLabs\Amqp\Scripts\Examples\AmqpObjectControlReference.cs" />
+    <Compile Include="Assets\CymaticLabs\Amqp\Scripts\Examples\AmqpObjectListController.cs" />
     <Compile Include="Assets\CymaticLabs\Amqp\Scripts\ExceptionUnityEvent.cs" />
     <Compile Include="Assets\CymaticLabs\Amqp\Scripts\UnityAmqpExchangeSubscription.cs" />
     <Compile Include="Assets\CymaticLabs\Amqp\Scripts\UnityAmqpQueueSubscription.cs" />
