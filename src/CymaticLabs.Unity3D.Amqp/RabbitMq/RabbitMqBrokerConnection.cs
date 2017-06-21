@@ -1089,7 +1089,7 @@ namespace CymaticLabs.Unity3D.Amqp.RabbitMq
         /// <returns>An Exception if one occurred during the operation, otherwise NULL.</returns>
         public Exception DeclareQueue(string name, bool durable = true, bool autoDelete = false, bool exclusive = false, IDictionary<string, object> args = null)
         {
-            if (IsConnected) throw new InvalidOperationException("Exchanges cannot be declared when disconnected");
+            if (!IsConnected) throw new InvalidOperationException("Queue cannot be declared when disconnected");
             if (string.IsNullOrEmpty(name)) throw new ArgumentNullException("name");
 
             try
@@ -1116,7 +1116,7 @@ namespace CymaticLabs.Unity3D.Amqp.RabbitMq
         /// <returns>An Exception if one occurred during the operation, otherwise NULL.</returns>
         public Exception DeleteQueue(string name, bool ifUnused = false, bool ifEmpty = false)
         {
-            if (IsConnected) throw new InvalidOperationException("Exchanges cannot be declared when disconnected");
+            if (!IsConnected) throw new InvalidOperationException("Queue cannot be deleted when disconnected");
             if (string.IsNullOrEmpty(name)) throw new ArgumentNullException("name");
 
             try
