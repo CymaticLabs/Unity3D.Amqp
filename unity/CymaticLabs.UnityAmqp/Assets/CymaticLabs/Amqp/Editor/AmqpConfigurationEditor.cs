@@ -248,6 +248,26 @@ namespace CymaticLabs.Unity3D.Amqp
                 c.RequestedHeartBeat = RequestedHeartBeat;
                 connections.Add(c);
             }
+            // Otherwise update to the current editor information for the current connection and save
+            else
+            {
+                foreach (var c in connections)
+                {
+                    if (c.Name == Name)
+                    {
+                        c.Name = Name;
+                        c.Host = Host;
+                        c.AmqpPort = AmqpPort;
+                        c.WebPort = WebPort;
+                        c.VirtualHost = VirtualHost;
+                        c.Username = Username;
+                        c.Password = Password;
+                        c.ReconnectInterval = ReconnectInterval;
+                        c.RequestedHeartBeat = RequestedHeartBeat;
+                        break;
+                    }
+                }
+            }
 
             // Serialize and save to disk
             try
