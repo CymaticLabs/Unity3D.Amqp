@@ -467,11 +467,12 @@ namespace CymaticLabs.Unity3D.Amqp
             // Connection Exceptions
             if (connectionExceptions.Count > 0)
             {
-                var errors = new Exception[connectionExceptions.Count];
+                Exception[] errors;
 
                 lock(this)
                 {
                     // Copy the list and clear queue
+                    errors = new Exception[connectionExceptions.Count];
                     connectionExceptions.CopyTo(errors, 0);
                     connectionExceptions.Clear();
                 }
@@ -491,11 +492,12 @@ namespace CymaticLabs.Unity3D.Amqp
             // Exchange Subscribe Exceptions
             if (exSubscribeExceptions.Count > 0)
             {
-                var errors = new Exception[exSubscribeExceptions.Count];
+                Exception[] errors;
 
                 lock (this)
                 {
                     // Copy the list and clear queue
+                    errors  = new Exception[exSubscribeExceptions.Count];
                     exSubscribeExceptions.CopyTo(errors, 0);
                     exSubscribeExceptions.Clear();
                 }
@@ -515,11 +517,12 @@ namespace CymaticLabs.Unity3D.Amqp
             // Exchange Unsubscribe Exceptions
             if (exUnsubscribeExceptions.Count > 0)
             {
-                var errors = new Exception[exUnsubscribeExceptions.Count];
+                Exception[] errors;
 
                 lock (this)
                 {
                     // Copy the list and clear queue
+                    errors = new Exception[exUnsubscribeExceptions.Count];
                     exUnsubscribeExceptions.CopyTo(errors, 0);
                     exUnsubscribeExceptions.Clear();
                 }
@@ -539,11 +542,12 @@ namespace CymaticLabs.Unity3D.Amqp
             // Queue Subscribe Exceptions
             if (exSubscribeExceptions.Count > 0)
             {
-                var errors = new Exception[queueSubscribeExceptions.Count];
+                Exception[] errors;
 
                 lock (this)
                 {
                     // Copy the list and clear queue
+                    errors = new Exception[queueSubscribeExceptions.Count];
                     queueSubscribeExceptions.CopyTo(errors, 0);
                     queueSubscribeExceptions.Clear();
                 }
@@ -563,11 +567,12 @@ namespace CymaticLabs.Unity3D.Amqp
             // Queue Unsubscribe Exceptions
             if (queueUnsubscribeExceptions.Count > 0)
             {
-                var errors = new Exception[queueUnsubscribeExceptions.Count];
+                Exception[] errors;
 
                 lock (this)
                 {
                     // Copy the list and clear queue
+                    errors = new Exception[queueUnsubscribeExceptions.Count];
                     queueUnsubscribeExceptions.CopyTo(errors, 0);
                     queueUnsubscribeExceptions.Clear();
                 }
@@ -591,11 +596,12 @@ namespace CymaticLabs.Unity3D.Amqp
             // Exchanges
             if (subscribedExchanges.Count > 0)
             {
-                var subscriptions = new AmqpExchangeSubscription[subscribedExchanges.Count];
+                AmqpExchangeSubscription[] subscriptions;
 
                 lock (this)
                 {
                     // Copy the list and clear queue
+                    subscriptions = new AmqpExchangeSubscription[subscribedExchanges.Count];
                     subscribedExchanges.CopyTo(subscriptions, 0);
                     subscribedExchanges.Clear();
                 }
@@ -613,11 +619,12 @@ namespace CymaticLabs.Unity3D.Amqp
             // Queues
             if (subscribedQueues.Count > 0)
             {
-                var subscriptions = new AmqpQueueSubscription[subscribedQueues.Count];
+                AmqpQueueSubscription[] subscriptions;
 
                 lock (this)
                 {
                     // Copy the list and clear queue
+                    subscriptions = new AmqpQueueSubscription[subscribedQueues.Count];
                     subscribedQueues.CopyTo(subscriptions, 0);
                     subscribedQueues.Clear();
                 }
@@ -639,11 +646,12 @@ namespace CymaticLabs.Unity3D.Amqp
             // Exchanges
             if (unsubscribedExchanges.Count > 0)
             {
-                var subscriptions = new AmqpExchangeSubscription[unsubscribedExchanges.Count];
+                AmqpExchangeSubscription[] subscriptions;
 
                 lock (this)
                 {
                     // Copy the list and clear queue
+                    subscriptions = new AmqpExchangeSubscription[unsubscribedExchanges.Count];
                     unsubscribedExchanges.CopyTo(subscriptions, 0);
                     unsubscribedExchanges.Clear();
                 }
@@ -661,11 +669,12 @@ namespace CymaticLabs.Unity3D.Amqp
             // Queues
             if (unsubscribedQueues.Count > 0)
             {
-                var subscriptions = new AmqpQueueSubscription[unsubscribedQueues.Count];
+                AmqpQueueSubscription[] subscriptions;
 
                 lock (this)
                 {
                     // Copy the list and clear queue
+                    subscriptions = new AmqpQueueSubscription[unsubscribedQueues.Count];
                     unsubscribedQueues.CopyTo(subscriptions, 0);
                     unsubscribedQueues.Clear();
                 }
@@ -687,11 +696,12 @@ namespace CymaticLabs.Unity3D.Amqp
             // Process exchange messages
             if (exMessages.Count > 0)
             {
-                var received = new AmqpExchangeReceivedMessage[exMessages.Count];
+                AmqpExchangeReceivedMessage[] received;
 
                 lock (this)
                 {
                     // Copy messages to temp list and clear queue
+                    received = new AmqpExchangeReceivedMessage[exMessages.Count];
                     exMessages.CopyTo(received, 0);
                     exMessages.Clear();
                 }
@@ -707,11 +717,12 @@ namespace CymaticLabs.Unity3D.Amqp
             // Process queue messages
             if (queueMessages.Count > 0)
             {
-                var received = new AmqpQueueReceivedMessage[queueMessages.Count];
+                AmqpQueueReceivedMessage[] received;
 
                 lock (this)
                 {
                     // Copy messages to temp list and clear queue
+                    received = new AmqpQueueReceivedMessage[queueMessages.Count];
                     queueMessages.CopyTo(received, 0);
                     queueMessages.Clear();
                 }
@@ -730,11 +741,12 @@ namespace CymaticLabs.Unity3D.Amqp
 
             if (exchangeListResults.Count > 0)
             {
-                var results = new AsyncExchangeListResult[exchangeListResults.Count];
+                AsyncExchangeListResult[] results;
 
                 lock (this)
                 {
                     // Copy the list and clear queue
+                    results = new AsyncExchangeListResult[exchangeListResults.Count];
                     exchangeListResults.CopyTo(results, 0);
                     exchangeListResults.Clear();
                 }
@@ -749,11 +761,12 @@ namespace CymaticLabs.Unity3D.Amqp
 
             if (queueListResults.Count > 0)
             {
-                var results = new AsyncQueueListResult[queueListResults.Count];
+                AsyncQueueListResult[] results;
 
                 lock (this)
                 {
                     // Copy the list and clear queue
+                    results = new AsyncQueueListResult[queueListResults.Count];
                     queueListResults.CopyTo(results, 0);
                     queueListResults.Clear();
                 }
